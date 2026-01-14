@@ -46,7 +46,7 @@ export default function Login() {
                     </Text>
 
                     <TouchableOpacity className="bg-white rounded-full items-center mt-12">
-                        <Text className="text-primary-300 font-poppins-semibold py-3 px-8 text-lg">Next</Text>
+                        <Text className="text-[#0f1a2b] font-poppins-semibold py-3 px-8 text-lg">Next</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
@@ -67,7 +67,7 @@ export default function Login() {
                     />
                     <View className="items-center">
                         <TouchableOpacity className="bg-white rounded-full items-center mt-12">
-                            <Text className="px-8 py-3 text-primary-300 text-lg font-poppins-semibold rounded-full">Log in</Text>
+                            <Text className="px-8 py-3 text-[#0f1a2b] text-lg font-poppins-semibold rounded-full">Log in</Text>
                         </TouchableOpacity>
                         <TouchableOpacity className="">
                             <Text className="text-white text-lg font-poppins-semibold mt-6">Forgot password?</Text>

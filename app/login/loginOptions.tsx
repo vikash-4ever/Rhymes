@@ -18,13 +18,13 @@ export default function LoginOptions() {
                 </TouchableOpacity>
                 <View className="flex items-center mt-[65%] px-8 gap-5">
                     <Text className="text-xl text-white font-poppins-semibold">Log in with</Text>
-                    <TouchableOpacity onPress={() => router.push("/login/loginScreen?method=phone")} className="bg-primary-300 flex-row w-full rounded-full py-3 justify-center items-center gap-4">
+                    <TouchableOpacity onPress={() => router.push("/login/loginScreen?method=phone")} className="bg-[#0f1a2b] flex-row w-full rounded-full py-3 justify-center items-center gap-4">
                         <Image source={icons.phone} tintColor={'white'} className="size-6"/>
                         <Text className="text-white text-lg font-poppins-semibold">Phone number</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => router.push("/login/loginScreen?method=email")} className="bg-white flex-row w-full rounded-full py-3 justify-center items-center gap-4">
                         <Image source={icons.email} tintColor={'black'} className="size-6"/>
-                        <Text className="text-black text-lg font-poppins-semibold">Email</Text>
+                        <Text className="text-[#0f1a2b] text-lg font-poppins-semibold">Email</Text>
                     </TouchableOpacity>
                 </View>
             </View>
