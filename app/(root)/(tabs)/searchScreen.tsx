@@ -1,5 +1,7 @@
 import icons from "@/constants/icons";
-import { searchSong } from "@/lib/songsApi";
+import { searchSongs } from "@/lib/api/musicApis";
+import { usePlayer } from "@/lib/PlayerContext";
+import { Song } from "@/types/song";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Image, Keyboard, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -7,62 +9,75 @@ import { ActivityIndicator, FlatList, Image, Keyboard, Text, TextInput, Touchabl
 export default function SearchScreen() {
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
-    const [results, setResults] = useState<any[]>([]);
+    const [results, setResults] = useState<Song[]>([]);
     const [debouncedQuery, setDebouncedQuery] = useState("");
+    const {playQueue} = usePlayer();
 
     const cancelTokenRef = useRef<AbortController | null>(null);
 
-    useEffect(() =>{
-        const timer = setTimeout(() => setDebouncedQuery(query.trim()), 600);
-        return() => clearTimeout(timer);
+    const rankSongs = (songs: Song[], query: string) => {
+        const q = query.toLowerCase();
+
+        return songs
+            .map((song) => {
+            const title = song.title.toLowerCase();
+
+            let score = 0;
+
+            if (title.startsWith(q)) score += 100; // 🔥 highest priority
+            else if (title.includes(" " + q)) score += 70;
+            else if (title.includes(q)) score += 50;
+
+            // fuzzy (tu vs tum)
+            if (q.length >= 2 && title.includes(q.slice(0, 2))) score += 20;
+
+            return { song, score };
+            })
+            .sort((a, b) => b.score - a.score)
+            .map((item) => item.song);
+    };
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+        setDebouncedQuery(query.trim());
+        }, 600);
+
+        return () => clearTimeout(timer);
     }, [query]);
 
     useEffect(() => {
         const fetchResults = async () => {
-            // ⛔ If empty → clear immediately
+
             if (!debouncedQuery) {
-            setResults([]);
-            setLoading(false);         // no results, no loader
-            if (cancelTokenRef.current) cancelTokenRef.current.abort();
-            return;
+                setResults([]);
+                return;
             }
 
-            // ✨ Important:
-            // Loader should start ONLY after debounce,
-            // because this means user has STOPPED typing.
             setLoading(true);
 
-            // Cancel previous request
-            if (cancelTokenRef.current) {
-            cancelTokenRef.current.abort();
-            }
-
-            const controller = new AbortController();
-            cancelTokenRef.current = controller;
-
             try {
-            const res = await searchSong(debouncedQuery, controller.signal);
 
-            if (res?.status === "success") {
-                setResults(res.results);
-            } else {
+                const res = await searchSongs(debouncedQuery);
+                const ranked = rankSongs(res || [], debouncedQuery);
+                setResults(ranked);
+
+            } catch (err) {
+
+                console.error("Search failed!", err);
+
                 setResults([]);
-            }
 
-            } catch (err: any) {
-            if (err.name === "AbortError" || err.message === "canceled") {
-                return; // ignore cancelled
-            }
-            console.error("Search failed!", err);
-            setResults([]);
             } finally {
-            setLoading(false);
+
+                setLoading(false);
+
             }
-        };
 
-        fetchResults();
-        }, [debouncedQuery]);
+            };
 
+            fetchResults();
+
+    }, [debouncedQuery]);
 
     const handleSubmit = () => {
         Keyboard.dismiss();
@@ -109,7 +124,7 @@ export default function SearchScreen() {
                         Find the music you love
                     </Text>
                     <Text className="text-sm text-gray-400 font-poppins-medium">
-                        from millions of artists, songs and playlists
+                        From millions of artists, songs and playlists.
                     </Text>
                 </View>
             ) : (
@@ -118,19 +133,23 @@ export default function SearchScreen() {
                         data={results}
                         keyExtractor={(item, index) => item.id || index.toString()}
                         showsVerticalScrollIndicator={false}
-                        renderItem={({ item }) => ( 
+                        renderItem={({ item, index }) => ( 
                             <TouchableOpacity
                                 className="w-full py-2 px-3"
                                 onPress={() => {
                                     router.push({
                                         pathname: "/searchResult",
-                                        params: { result: JSON.stringify(item) }
+                                        params: {
+                                            result: JSON.stringify(item),
+                                            queue: JSON.stringify(results),
+                                            index: index
+                                        }
                                     });
                                 }}
                                 >
                                 <View className="flex-row items-center gap-3">
                                     <Image
-                                        source={item.thumbnail ? { uri: item.thumbnail } : icons.disk}
+                                        source={item.thumbnail_url ? { uri: item.thumbnail_url } : icons.disk}
                                         resizeMode="stretch"
                                         className="h-12 w-12"
                                     />
@@ -139,7 +158,7 @@ export default function SearchScreen() {
                                         {item.title}
                                     </Text>
                                     <Text className="text-sm text-gray-500" ellipsizeMode="tail" numberOfLines={1}>
-                                        {item.artist || "Unknown Artist"}
+                                        {item.artists?.map(a => a.name).join(", ") || "Unknown Artist"}
                                     </Text>
                                     </View>
                                 </View>

@@ -1,185 +1,213 @@
-// PlayerContext.tsx — FINAL WORKING VERSION
-import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import { Song } from "@/types/song";
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { config, databases } from "./appwrite";
 import { useGlobalContext } from "./global-provider";
-import { resolveAudio } from "./songsApi";
 
-const DATABASE_ID = config.databaseId;
-const USER_COLLECTION_ID = config.usersCollectionId;
-
-export type Track = {
-  title: string;
-  artist?: string;
-  url: string;
-  thumbnail?: string;
-  originalLink?: string;
-};
-
-export type PlayerContextType = {
-  currentTrack: Track | null;
+type PlayerContextType = {
+  currentTrack: Song | null;
   isPlaying: boolean;
   isPreparing: boolean;
-  audioSource: string | null;
-
+  isShuffle: boolean;
+  repeatMode: "off" | "one" | "all";
   player: any;
-  playTrack: (track: Track) => Promise<void>;
+
+  playTrack: (track: Song) => Promise<void>;
+  playQueue: (songs: Song[], startIndex: number) => Promise<void>;
+
+  playNext: () => Promise<void>;
+  playPrevious: () => Promise<void>;
+
   togglePlayPause: () => Promise<void>;
   stopTrack: () => Promise<void>;
+  resetPlayer: () => Promise<void>;
   seekTo: (seconds: number) => Promise<void>;
 
-  toggleLikeTrack: (track: Track) => Promise<void>;
-  isTrackLiked: (track: Track) => boolean;
+  setIsShuffle: React.Dispatch<React.SetStateAction<boolean>>;
+  setRepeatMode: React.Dispatch<React.SetStateAction<"off" | "one" | "all">>;
 };
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
 
 export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
+
+  const {user} = useGlobalContext();
+
+  useEffect(() => {
+    if (!user) {
+      resetPlayer();
+    }
+  }, [user])
+  useEffect(() => {
+    setAudioModeAsync({
+      interruptionMode: "duckOthers",
+      playsInSilentMode: true,
+    });
+  }, []);
+
   const [audioSource, setAudioSource] = useState<string | null>(null);
 
-  // Player re-creates whenever audioSource changes
-  const player = useAudioPlayer(audioSource ?? undefined);
+  const player = useAudioPlayer(
+    audioSource ? { uri: audioSource } : undefined
+  );
+
   const status = useAudioPlayerStatus(player);
 
   const isPlaying = Boolean(status?.playing);
+
   const [isPreparing, setIsPreparing] = useState(false);
 
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [currentTrack, setCurrentTrack] = useState<Song | null>(null);
 
-  const { user, setUser, recentlyPlayed, setRecentlyPlayed } =
-    useGlobalContext() as any;
+  const [queue, setQueue] = useState<Song[]>([]);
 
-  // ----------------------------
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+
+  const { recentlyPlayed, setRecentlyPlayed } = useGlobalContext();
+
+  const [isShuffle, setIsShuffle] = useState(false);
+
+  const [repeatMode, setRepeatMode] = useState<"off" | "one" | "all">("off");
+
+  // -------------------------
   // Recently Played
-  // ----------------------------
-  const addToRecentlyPlayed = (track: Track) => {
+  // -------------------------
+
+  const addToRecentlyPlayed = (track: Song) => {
+    const updated = [
+      track,
+      ...recentlyPlayed.filter((t) => t.id !== track.id),
+    ].slice(0, 10);
+
+    setRecentlyPlayed(updated);
+  };
+
+  // -------------------------
+  // PLAY TRACK
+  // -------------------------
+
+  const playTrack = async (track: Song) => {
     try {
-      const newTrack = {
-        title: track.title,
-        artist: track.artist,
-        url: track.originalLink ?? track.url,
-        thumbnail: track.thumbnail,
-      };
-      const updated = [
-        newTrack,
-        ...recentlyPlayed.filter((t: any) => t.url !== newTrack.url),
-      ].slice(0, 10);
-      setRecentlyPlayed(updated);
-    } catch (_) {}
-  };
 
-  // ----------------------------
-  // Likes
-  // ----------------------------
-  const getLikedTracks = (): Track[] => {
-    if (!user?.likedAudios) return [];
-    return user.likedAudios.map((t: any) =>
-      typeof t === "string" ? JSON.parse(t) : t
-    );
-  };
-
-  const isTrackLiked = (track: Track): boolean => {
-    return getLikedTracks().some((t) => t.url === track.url);
-  };
-
-  const toggleLikeTrack = async (track: Track) => {
-    if (!user) return;
-
-    const liked = isTrackLiked(track);
-    const likedTracks = getLikedTracks();
-
-    const updated = liked
-      ? likedTracks.filter((t: any) => t.url !== track.url)
-      : [...likedTracks, track];
-
-    try {
-      await databases.updateDocument(
-        DATABASE_ID,
-        USER_COLLECTION_ID,
-        user.$id,
-        { likedAudios: updated.map((t: any) => JSON.stringify(t)) }
-      );
-      setUser({ ...user, likedAudios: updated });
-    } catch (_) {}
-  };
-
-  // ----------------------------
-  // PLAY TRACK (Option A improved)
-  // ----------------------------
-  const playTrack = async (track: Track) => {
-    try {
       setIsPreparing(true);
+      setQueue([track]);
+      setCurrentIndex(0);
       setCurrentTrack(track);
       addToRecentlyPlayed(track);
-
-      const ytLink = track.originalLink ?? track.url;
-      const resolved = await resolveAudio(ytLink);
-
-      if (!resolved?.audio_url) {
-        setIsPreparing(false);
-        return;
-      }
-
-      const streamUrl = resolved.audio_url;
-
-      // Changing audioSource will recreate player internally
-      setAudioSource(streamUrl);
-
+      setAudioSource(track.audio_url);
+      setIsPreparing(false);
     } catch (err) {
       console.warn("playTrack error:", err);
       setIsPreparing(false);
     }
   };
 
-  // Auto-play whenever source changes and player gets recreated
+  const playQueue = async (songs: Song[], startIndex: number) => {
+    try{
+      const track = songs[startIndex];
+      setQueue(songs);
+      setCurrentIndex(startIndex);
+      setCurrentTrack(track);
+      addToRecentlyPlayed(track);
+      setAudioSource(track.audio_url);
+    } catch (error){
+      console.warn("playQueue error!", error);
+    }
+  }
+
   useEffect(() => {
+
     if (!audioSource) return;
 
-    // Start playing as soon as new player is ready
-    const startPlay = async () => {
+    const start = async () => {
       try {
         await player.play();
-      } catch (_) {}
-      setIsPreparing(false);
+      } catch {}
     };
 
-    startPlay();
+    start();
+
   }, [audioSource]);
 
-  // ----------------------------
+  const playNext = async () => {
+    if (queue.length === 0) return;
+
+    if(repeatMode === "one"){
+      await player.seekTo(0);
+      await player.play();
+      return;
+    }
+
+    let nextIndex;
+
+    if(isShuffle) {
+      nextIndex = Math.floor(Math.random() * queue.length);
+    } else {
+        nextIndex = currentIndex + 1;
+        if(nextIndex >= queue.length){
+          if(repeatMode === "all") nextIndex = 0;
+          else return;
+        }
+    }
+    const nextTrack = queue[nextIndex];
+    setCurrentIndex(nextIndex);
+    setCurrentTrack(nextTrack);
+    setAudioSource(nextTrack.audio_url);
+  };
+
+  const playPrevious = async () => {
+    if (queue.length === 0) return;
+    setCurrentIndex(prev => {
+      const prevIndex = prev === 0 ? queue.length - 1 : prev - 1;
+      const prevTrack = queue[prevIndex];
+      setCurrentTrack(prevTrack);
+      setAudioSource(prevTrack.audio_url);
+      return prevIndex;
+    })
+  };
+
+
+  // -------------------------
   // CONTROLS
-  // ----------------------------
+  // -------------------------
+
   const togglePlayPause = async () => {
+
     if (isPlaying) await player.pause();
     else await player.play();
+
+  };
+  
+  const seekTo = async (seconds: number) => {
+    try {
+      await player.seekTo(seconds);
+    } catch {}
   };
 
   const stopTrack = async () => {
     try {
-      await player.pause();
       await player.seekTo(0);
-    } catch (_) {}
+    } catch {}
   };
 
-  const seekTo = async (seconds: number) => {
-    try {
-      await player.seekTo(seconds);
-    } catch (err) {}
-  };
-
-  // ----------------------------
-  // Auto-stop
-  // ----------------------------
   useEffect(() => {
-    if (status?.didJustFinish) {
-      (async () => {
-        try {
-          await player.seekTo(0);
-          await player.pause();
-        } catch (_) {}
-      })();
+    if (!status) return;
+    
+    if (status.duration && status.currentTime >= status.duration - 0.3){
+      playNext();
     }
-  }, [status?.didJustFinish]);
+  }, [status?.currentTime]);
+
+  const resetPlayer = async () => {
+    try {
+      await player.pause();
+      setAudioSource(null);   // 🔥 remove source
+      setCurrentTrack(null);
+      setQueue([]);
+      setCurrentIndex(0);
+    } catch (error) {
+      console.warn("resetPlayer error:", error);
+    }
+  };
 
   return (
     <PlayerContext.Provider
@@ -187,16 +215,23 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
         currentTrack,
         isPlaying,
         isPreparing,
-        audioSource,
-
+        isShuffle,
         player,
+        repeatMode,
+
         playTrack,
+        playQueue,
+
+        playNext,
+        playPrevious,
+        
         togglePlayPause,
         stopTrack,
+        resetPlayer,
         seekTo,
 
-        toggleLikeTrack,
-        isTrackLiked,
+        setIsShuffle,
+        setRepeatMode
       }}
     >
       {children}

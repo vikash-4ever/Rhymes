@@ -1,15 +1,35 @@
 import icons from "@/constants/icons";
-import { logoutUser } from "@/lib/auth";
+import { useGlobalContext } from "@/lib/global-provider";
+import { usePlayer } from "@/lib/PlayerContext";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Image, Modal, Text, TouchableOpacity, View } from "react-native";
+import { Models } from "react-native-appwrite";
+
+type AppUser = Models.Document & {
+    email?: string;
+    name?: string;
+};
 
 export default function SettingsScreen() {
+    const {user, logout} = useGlobalContext();
+    const appUser = user as AppUser;
     const [showModal, setShowModal] = useState(false);
+    const {resetPlayer} = usePlayer();
 
     const handleClickLogout = () =>{
         setShowModal(true); 
     };
+
+    const handleLogout = async () => {
+        try{
+            setShowModal(false);
+            await resetPlayer();
+            await logout();
+        } catch (error) {
+            console.log("Logout Error : ", error);
+        }
+    }
 
     return(
         <View className="flex bg-primary-200 w-full h-full">
@@ -25,10 +45,18 @@ export default function SettingsScreen() {
             </View>
             <TouchableOpacity className="flex w-full px-5 py-3">
                 <Text className="text-white text-lg font-poppins-regular">
+                    Account
+                </Text>
+                <Text className="text-sm text-gray-400">
+                    {appUser?.name || appUser?.email || "Guest"}
+                </Text>
+            </TouchableOpacity>
+            <TouchableOpacity className="flex w-full px-5 py-3">
+                <Text className="text-white text-lg font-poppins-regular">
                     Mobile Data
                 </Text>
                 <Text className="text-sm text-gray-400">
-                    4 MB used by Spotify Lite this month
+                    4 MB used by Rhymes this month
                 </Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex w-full px-5 py-3">
@@ -36,7 +64,7 @@ export default function SettingsScreen() {
                     Storage
                 </Text>
                 <Text className="text-sm text-gray-400">
-                    57 MB used by Spotify Lite
+                    57 MB used by Rhymes
                 </Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex w-full px-5 py-3">
@@ -44,7 +72,7 @@ export default function SettingsScreen() {
                     Audio Settings
                 </Text>
                 <Text className="text-sm text-gray-400">
-                    Audio Quality: Basic
+                    Audio Quality: Auto
                 </Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex w-full px-5 py-3">
@@ -77,7 +105,7 @@ export default function SettingsScreen() {
                     <Text className="text-white text-lg font-poppins-semibold">Rhymes</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleClickLogout} className="flex flex-row items-center py-4 gap-4">
-                    <Image source={icons.logout} tintColor={'white'} className="size-7"/>
+                    <Image source={icons.logout} tintColor={'red'} className="size-7"/>
                     <Text className="text-white text-lg font-poppins-semibold">Logout</Text>
                 </TouchableOpacity>
             </View>
@@ -94,7 +122,7 @@ export default function SettingsScreen() {
 
                         <View className="flex-col items-center gap-6 mt-6 mb-4">
                         <TouchableOpacity
-                            onPress={logoutUser}
+                            onPress={handleLogout}
                             className="bg-primary-300 rounded-full items-center justify-center"
                         >
                             <Text className="text-white text-lg px-8 py-3 font-poppins-semibold">Log out</Text>

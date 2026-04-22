@@ -19,6 +19,7 @@ export default function SignIN() {
   const [index, setIndex] = useState(0);
   const translateX = useRef(new Animated.Value(0)).current;
   const { user } = useGlobalContext();
+  const {refreshUser} = useGlobalContext();
 
   useEffect(() =>{
     if(user) {
@@ -62,7 +63,7 @@ export default function SignIN() {
         const existingUsers = await databases.listDocuments(
           config.databaseId,
           config.usersCollectionId,
-          [Query.equal("email", loggedInUser.email)]
+          [Query.equal("userId", loggedInUser.$id)]
         );
 
         if (existingUsers.total === 0) {
@@ -73,6 +74,7 @@ export default function SignIN() {
             {
               name: loggedInUser.name || "",
               email: loggedInUser.email,
+              userId: loggedInUser.$id,
               profilePic: loggedInUser.prefs?.profilePic || "",
               phone: null,
               likedAudios: [],
@@ -84,7 +86,7 @@ export default function SignIN() {
         } else {
           console.log("ℹ️ User already exists in DB");
         }
-
+        await refreshUser();
         router.replace("/(root)/(tabs)"); // Use replace to prevent going back
       }
     } catch (err) {

@@ -1,6 +1,5 @@
 // lib/auth.ts
 import * as AuthSession from "expo-auth-session";
-import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { OAuthProvider } from "react-native-appwrite";
 import { account } from "./appwrite"; // Your Appwrite config file
@@ -60,7 +59,6 @@ export async function loginWithGoogle() {
 
 export async function logoutUser() {
   await account.deleteSession("current");
-  router.push("/login/signIn")
   console.log("🚪 User logged out.");
 }
 

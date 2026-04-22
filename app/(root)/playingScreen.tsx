@@ -1,5 +1,6 @@
 import icons from "@/constants/icons";
 import images from "@/constants/images";
+import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Slider } from "@miblanchard/react-native-slider";
 import { useAudioPlayerStatus } from "expo-audio";
@@ -25,17 +26,30 @@ export default function PlayingScreen() {
     currentTrack,
     isPlaying,
     togglePlayPause,
-    isTrackLiked,
-    toggleLikeTrack,
     isPreparing,
     player,
+    playNext,
+    playPrevious,
+    isShuffle,
+    setIsShuffle,
+    repeatMode,
+    setRepeatMode
   } = usePlayer();
+
+  const {likedSongs, setLikedSongs, handleToggleLike} = useGlobalContext();
 
   const { currentTime = 0, duration = 0, isBuffering = false } =
     useAudioPlayerStatus(player) || {};
 
+  const isLiked = currentTrack ? likedSongs.includes(currentTrack!.id) : false;
   const [isSliding, setIsSliding] = useState(false);
   const [slideValue, setSlideValue] = useState(0);
+
+  const handleLikePress = async () => {
+    if (!currentTrack) return;
+    const alreadyLiked = likedSongs.includes(currentTrack.id);
+    await handleToggleLike(currentTrack.id);
+  }
 
   if (!currentTrack) {
     return (
@@ -61,11 +75,16 @@ export default function PlayingScreen() {
 
   const showLoader = isPreparing || isBuffering;
   const playIcon = isPlaying ? icons.pause : icons.play;
+  const toggleRepeat = () => {
+    setRepeatMode(prev => 
+      prev === "off" ? "one" : prev === "one" ? "all" : "off"
+    );
+  };
 
   return (
     <View className="flex-1 bg-primary-200">
       {/* Header */}
-      <View className="flex flex-row items-center justify-between">
+      <View className="flex flex-row items-center justify-between mt-4 px-3">
         <TouchableOpacity onPress={() => router.back()}>
           <Image source={icons.down} tintColor="white" className="size-6 m-4" />
         </TouchableOpacity>
@@ -75,7 +94,7 @@ export default function PlayingScreen() {
             Now Playing
           </Text>
           <Text className="text-white text-md font-bold">
-            {showLoader ? "Loading…" : "Playing"}
+            {showLoader ? "Loading…" : "From search"}
           </Text>
         </View>
 
@@ -85,14 +104,14 @@ export default function PlayingScreen() {
       </View>
 
       {/* Album Art */}
-      <View className="items-center mt-8 px-7">
+      <View className="items-center mt-4 px-7">
         <Image
           source={
-            currentTrack.thumbnail
-              ? { uri: currentTrack.thumbnail }
+            currentTrack.thumbnail_url
+              ? { uri: currentTrack.thumbnail_url }
               : images.image3
           }
-          className="w-full h-80"
+          className="w-full h-96"
           resizeMode="contain"
         />
       </View>
@@ -106,18 +125,22 @@ export default function PlayingScreen() {
           >
             {currentTrack.title}
           </Text>
-          <Text className="text-gray-400 font-poppins-regular">
-            {currentTrack.artist}
+          <Text 
+            className="text-gray-400 font-poppins-regular" 
+            numberOfLines={1}
+          >
+            {currentTrack.artists?.map((a) => a.name).join(", ")}
           </Text>
         </View>
 
-        <TouchableOpacity onPress={() => toggleLikeTrack(currentTrack)}>
+        <TouchableOpacity 
+          className="mt-4"
+          onPress={handleLikePress}
+        >
           <Image
-            source={
-              isTrackLiked(currentTrack) ? icons.heartFilled : icons.heart
-            }
+            source={ isLiked ? icons.heartFilled : icons.heart }
             tintColor="white"
-            className="size-7 m-2"
+            className="size-7 mx-2 mt-4"
           />
         </TouchableOpacity>
       </View>
@@ -125,6 +148,7 @@ export default function PlayingScreen() {
       {/* Seek Bar */}
       <View className="w-full mt-4 px-7">
         <Slider
+          trackStyle ={{height: 6}}
           value={position}
           minimumValue={0}
           maximumValue={total}
@@ -139,38 +163,45 @@ export default function PlayingScreen() {
           onSlidingComplete={onSlideComplete}
         />
 
-        <View className="flex-row justify-between mt-1">
+        <View className="flex-row justify-between">
           <Text className="text-white text-xs">{fmt(position)}</Text>
           <Text className="text-white text-xs">{fmt(total)}</Text>
         </View>
       </View>
 
       {/* Controls */}
-      <View className="flex-row justify-between items-center px-7 mt-4">
-        <TouchableOpacity>
-          <Image source={icons.shuffle} tintColor="#ffffff38" className="w-7 h-7" />
+      <View className="flex-row h-20 w-full justify-between items-center px-7 mt-4">
+        <TouchableOpacity onPress={() => setIsShuffle(prev => !prev)} className="h-12 w-12 items-center justify-center">
+          <Image source={icons.shuffle} tintColor={isShuffle ? "white" : "#ffffff38"} className="w-7 h-7" />
         </TouchableOpacity>
 
-        <TouchableOpacity>
+        <TouchableOpacity onPress={playPrevious} className="h-12 w-12 items-center justify-center">
           <Image source={icons.previous} tintColor="white" className="w-7 h-7" />
         </TouchableOpacity>
 
-        <View className="w-20 h-20 bg-white rounded-full items-center justify-center">
+        <TouchableOpacity onPress={togglePlayPause} className="w-20 h-20 bg-white rounded-full items-center justify-center">
           {showLoader ? (
             <ActivityIndicator size="small" color="#000" />
           ) : (
-            <TouchableOpacity onPress={togglePlayPause}>
+            <View>
               <Image source={playIcon} tintColor="black" className="w-6 h-6" />
-            </TouchableOpacity>
+            </View>
           )}
-        </View>
+        </TouchableOpacity>
 
-        <TouchableOpacity>
+        <TouchableOpacity onPress={playNext} className="h-12 w-12 items-center justify-center">
           <Image source={icons.next} tintColor="white" className="w-7 h-7" />
         </TouchableOpacity>
 
-        <TouchableOpacity>
-          <Image source={icons.repeat} tintColor="#ffffff38" className="w-7 h-7" />
+        <TouchableOpacity onPress={toggleRepeat} className="h-12 w-12 items-center justify-center">
+          <View>
+            <Image source={icons.repeat} tintColor={repeatMode === "off" ? "#ffffff38" : "white"} className="w-7 h-7" />
+            {repeatMode === "one" && (
+              <Text className="absolute text-white font-poppins-bold bg-black text-xs bottom-0 right-0">
+                1
+              </Text>
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 

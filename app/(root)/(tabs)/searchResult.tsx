@@ -1,7 +1,9 @@
-// SearchResult.tsx — FINAL VERSION
 import icons from "@/constants/icons";
 import images from "@/constants/images";
+import { incrementPlay } from "@/lib/api/musicApis";
+import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
+import { Song } from "@/types/song";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useLocalSearchParams } from "expo-router/build/hooks";
@@ -9,51 +11,41 @@ import React from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 
 export default function SearchResult() {
-  const { result } = useLocalSearchParams();
-  const song = result ? JSON.parse(result as string) : null;
+  const { result, queue, index } = useLocalSearchParams();
+  const song:Song | null = result ? JSON.parse(result as string) : null;
+  const songQueue: Song[] = queue ? JSON.parse(queue as string) : null;
+  const currentIndex = index ? Number(index): 0;
 
+  const {likedSongs, setLikedSongs, handleToggleLike} =useGlobalContext();
+  const {playQueue ,playTrack, togglePlayPause, currentTrack, isPlaying} = usePlayer();
   const title = song?.title || "Unknown Title";
-  const artist = song?.artist || "Unknown Artist";
-  const thumbnail = song?.thumbnail || null;
-  const originalUrl = song?.url;
+  const artist = song?.artists?.map((a) => a.name).join(", ") || "Unknown Artist";
+  const thumbnail = song?.thumbnail_url;
 
-  const {
-    currentTrack,
-    isPlaying,
-    togglePlayPause,
-    playTrack,
-    isTrackLiked,
-    toggleLikeTrack,
-    isPreparing,
-  } = usePlayer();
+  const isCurrentSong = currentTrack?.id === song?.id;
 
-  const isSameSong =
-    currentTrack &&
-    (currentTrack.originalLink === originalUrl ||
-      currentTrack.url === originalUrl);
+  const buttonText = !isCurrentSong ? "Play" : isPlaying ? "Pause" : "Resume";
 
-  const handlePlay = async () => {
-    if (!originalUrl) return;
+  const isLiked = song ? likedSongs.includes(song.id) : false;
 
-    if (isSameSong) {
-      await togglePlayPause();
-      return;
+  const handlePress = async () => {
+    if(!song) return;
+    try {
+      if(!isCurrentSong){
+        await playQueue(songQueue, currentIndex);
+        incrementPlay(song.id);
+      }else{
+        await togglePlayPause();
+      }
+    } catch(error) {
+      console.warn("Player action failed!", error);
     }
-
-    await playTrack({
-      title,
-      artist,
-      thumbnail,
-      url: originalUrl,
-      originalLink: originalUrl,
-    });
   };
 
-  const buttonText = isSameSong
-    ? isPlaying
-      ? "Pause"
-      : "Resume"
-    : "Play";
+  const handleLikePress = async () => {
+    if(!song) return;
+    await handleToggleLike(song.id);
+  }
 
   return (
     <View className="flex-1 bg-black w-full items-center justify-center">
@@ -67,9 +59,9 @@ export default function SearchResult() {
         </TouchableOpacity>
 
         <View className="flex-row items-center justify-center">
-          <TouchableOpacity onPress={() => toggleLikeTrack(song)}>
+          <TouchableOpacity onPress={handleLikePress}>
             <Image
-              source={isTrackLiked(song) ? icons.heartFilled : icons.heart}
+              source={isLiked ? icons.heartFilled : icons.heart}
               tintColor={"white"}
               className="size-6 m-5"
             />
@@ -93,11 +85,10 @@ export default function SearchResult() {
         </Text>
 
         <TouchableOpacity
-          onPress={handlePlay}
-          className="bg-primary-300 px-8 py-4 rounded-full mt-8"
-          disabled={isPreparing}
+          className="bg-gray-400 px-8 py-4 rounded-full mt-8"
+          onPress={handlePress}
         >
-          <Text className="text-white text-lg font-poppins-semibold">
+          <Text className="text-black text-lg font-poppins-semibold">
             {buttonText}
           </Text>
         </TouchableOpacity>

@@ -18,7 +18,7 @@ const AppTabs = () => {
 
     return(
       <View className="flex-1 bg-black">
-        <Tabs screenOptions={{ tabBarShowLabel: false, tabBarStyle: { backgroundColor: "#232323", height:56, borderTopColor:'black'} }}>
+        <Tabs screenOptions={{ tabBarShowLabel: false, tabBarStyle: { backgroundColor: "#000000", height:56, borderTopColor:'#6f7684'} }}>
           <Tabs.Screen name="index" options={{
             title: 'Home',
             headerShown: false,
@@ -43,6 +43,14 @@ const AppTabs = () => {
             headerShown: false,
           }}/>
           <Tabs.Screen name="searchResult" options={{
+            href: null,
+            headerShown: false,
+          }}/>
+          <Tabs.Screen name="favouriteSongs" options={{
+            href: null,
+            headerShown: false,
+          }}/>
+          <Tabs.Screen name="artistSongs" options={{
             href: null,
             headerShown: false,
           }}/>

@@ -93,7 +93,7 @@ export default function Search() {
         columnWrapperStyle={{ justifyContent: "space-between" }}
         showsVerticalScrollIndicator={false}
         renderItem={({ item, index }) => (
-          <View
+          <TouchableOpacity
             className="h-20 px-3 py-2 rounded mb-4 justify-center"
             style={{
               backgroundColor: assignedColors[index],
@@ -103,7 +103,7 @@ export default function Search() {
             <Text className="text-white font-bold text-lg" numberOfLines={2}>
               {item.title}
             </Text>
-          </View>
+          </TouchableOpacity>
         )}
       />
     </View>

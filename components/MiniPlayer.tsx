@@ -1,4 +1,5 @@
 import icons from "@/constants/icons";
+import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { useAudioPlayerStatus } from "expo-audio";
 import { router } from "expo-router";
@@ -18,10 +19,8 @@ export default function MiniPlayer() {
     currentTrack,
     isPlaying,
     togglePlayPause,
-    stopTrack,
+    playNext,
     player,
-    isTrackLiked,
-    toggleLikeTrack,
     isPreparing,
   } = usePlayer();
 
@@ -36,8 +35,19 @@ export default function MiniPlayer() {
   const scrollAnim = useRef(new Animated.Value(0)).current;
 
   const title = currentTrack.title || "Unknown Audio";
-  const artist = currentTrack.artist || "Unknown Artist";
-  const textToScroll = `${title}  •  ${artist}     `;
+  const artist = currentTrack.artists?.map((a) => a.name).join(", ") || "Unknown Artist";
+  const textToScroll = `${title}  •  ${artist}`;
+
+  const {likedSongs, setLikedSongs, handleToggleLike} = useGlobalContext();
+
+  const isLiked = currentTrack ? likedSongs.includes(currentTrack.id) : false;
+
+  const handleLikePress = async () => {
+    if(!currentTrack) return;
+
+    const alreadyLiked = likedSongs.includes(currentTrack.id);
+    await handleToggleLike(currentTrack.id);
+  };
 
   useEffect(() => {
     if (textWidth > containerWidth && containerWidth > 0) {
@@ -87,11 +97,12 @@ export default function MiniPlayer() {
 
       <View className="flex-1 flex-row w-full items-center justify-between">
         {/* Like */}
-        <TouchableOpacity onPress={() => toggleLikeTrack(currentTrack)}>
+        <TouchableOpacity 
+          className="h-full items-center justify-center"
+          onPress={handleLikePress}
+        >
           <Image
-            source={
-              isTrackLiked(currentTrack) ? icons.heartFilled : icons.heart
-            }
+            source={ isLiked ? icons.heartFilled :icons.heart }
             tintColor="white"
             className="size-6 mx-4"
           />
@@ -113,24 +124,24 @@ export default function MiniPlayer() {
         </View>
 
         {/* Play / Pause / Loader */}
-        <View className="flex-row items-center mr-4">
-          <TouchableOpacity disabled={shouldShowLoader} onPress={togglePlayPause}>
+        <View className="flex-row items-center justify-between">
+          <TouchableOpacity disabled={shouldShowLoader} onPress={togglePlayPause} className="h-14 w-12 pl-2 items-center justify-center">
             {shouldShowLoader ? (
               <ActivityIndicator size="small" color="white" style={{ marginHorizontal: 12 }} />
             ) : (
               <Image
                 source={isPlaying ? icons.pause : icons.play}
                 tintColor="white"
-                className="size-5 mx-3"
+                className="size-5"
               />
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={stopTrack}>
+          <TouchableOpacity onPress={playNext} className="h-14 w-12 pr-2 items-center justify-center">
             <Image
               source={icons.next}
               tintColor="white"
-              className="size-6 ml-1"
+              className="size-6"
             />
           </TouchableOpacity>
         </View>
