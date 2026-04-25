@@ -1,23 +1,28 @@
 import SongItem from "@/components/SongItem";
 import icons from "@/constants/icons";
 import { getSongsByArtist, getSongsByIds } from "@/lib/api/musicApis";
+import { toggleLike, toggleSongInPlaylist } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Image, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Animated, Image, Modal, Text, TouchableOpacity, View } from "react-native";
 
 export default function FavouriteSongs(){
 
     const {playQueue} = usePlayer();
     const {type, id, title, artist} = useLocalSearchParams();
-    const {likedSongs, playlists} = useGlobalContext();
+    const {user, likedSongs, setLikedSongs, playlists, loadPlaylists} = useGlobalContext();
     const [songs, setSongs] = useState<Song[]>([]);
     const [songsLoading, setSongsLoading] = useState(false);
+    const [songOptionsModal, setSongOptionsModal] = useState(false);
+    const [selectedSong, setSelectedSong] = useState<Song | null>(null);
     const prevIdsRef = useRef<string[]>([]);
     const scrollY = useState(new Animated.Value(0))[0];
+
+    const isLiked = selectedSong ? likedSongs.includes(selectedSong.id) : false;
 
     let sourceIds: string[] = [];
     let isArtist = false;
@@ -182,13 +187,91 @@ export default function FavouriteSongs(){
                                 index={index}
                                 songs={songs}
                                 onOptionsPress={() => {
-                                    console.log("option for ", song.title);
+                                    setSelectedSong(song);
+                                    setSongOptionsModal(true);
                                 }}
                             />    
                         ))
                     }
                 </Animated.ScrollView>
             )}
+
+            <Modal
+                visible={songOptionsModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setSongOptionsModal(false)}
+                >
+                <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={() => setSongOptionsModal(false)}
+                    className="flex-1 justify-end bg-[#00000080]"
+                >
+                    <TouchableOpacity
+                    activeOpacity={1}
+                    onPress={() => {}}
+                    className="bg-gray-700 rounded-t-2xl px-6 py-6"
+                    >
+                    <Text className="text-white text-xl self-center font-poppins-semibold mb-4">
+                        {selectedSong?.title}
+                    </Text>
+
+                    <TouchableOpacity
+                        onPress={async () => {
+                            if (!selectedSong || !user) return;
+
+                            const updated = await toggleLike(user.$id, selectedSong.id);
+                            setLikedSongs(updated);
+
+                            setSongOptionsModal(false);
+                        }}
+                        className="py-3"
+                    >
+                        <Text className="text-white text-lg font-poppins-medium">
+                            {isLiked ? "Remove from Favourite" : "Add to Favourite"}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* PLAYLIST LIST */}
+                    {playlists.map((playlist) => {
+                        const isAdded = selectedSong ? (playlist.songIds || []).includes(selectedSong?.id) : false;
+
+                        return (
+                        <TouchableOpacity
+                            key={playlist.$id}
+                            onPress={async () => {
+                            if (!selectedSong) return;
+
+                            await toggleSongInPlaylist(
+                                playlist.$id,
+                                selectedSong.id
+                            );
+
+                            // UI update
+                            await loadPlaylists();
+
+                            setSongOptionsModal(false);
+                            }}
+                            className="py-3"
+                        >
+                            <Text className="text-white text-lg font-poppins-medium">
+                            {isAdded ? "Remove from " : "Add to "} {playlist.name}
+                            </Text>
+                        </TouchableOpacity>
+                        );
+                    })}
+
+                    <TouchableOpacity
+                        onPress={() => setSongOptionsModal(false)}
+                        className="py-4 mt-2"
+                    >
+                        <Text className="text-center text-gray-500 text-lg font-poppins-medium">
+                        Cancel
+                        </Text>
+                    </TouchableOpacity>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+                </Modal>
         </View>
     );
 }

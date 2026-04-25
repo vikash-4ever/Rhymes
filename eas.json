@@ -9,7 +9,16 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "68dd4eec001f7972c677",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_NAME": "rhymes",
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_DATABASE_ID": "68dd57910005aafbf909",
+        "EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID": "users",
+        "EXPO_PUBLIC_APPWRITE_PLAYLISTS_COLLECTION_ID": "playlists",
+        "EXPO_PUBLIC_API_URL": "https://rhymes-backend.onrender.com"
+      }
     },
     "production": {
       "autoIncrement": true

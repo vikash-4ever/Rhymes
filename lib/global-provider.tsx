@@ -6,7 +6,12 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { ID, Models } from "react-native-appwrite";
 import { account, config, databases, getLikedSongs, getUserPlaylists, Query, toggleLike } from "./appwrite";
 
-type UserProfile = Models.Document | null;
+type UserProfile = {
+  $id: string;
+  userId: string;
+  email: string;
+  likedAudios: string[];
+} | null;
 
 type GlobalContextType = {
   user: UserProfile;
@@ -30,7 +35,7 @@ type GlobalContextType = {
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
 
 export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<UserProfile>(null);
   const [loading, setLoading] = useState(true);
   const [likesLoading, setLikesLoading] = useState(true);
   const [recentlyPlayed, setRecentlyPlayed] = useState<Song[]>([]);
@@ -69,7 +74,13 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           currentUser = res.documents[0];
         }
-        setUser(currentUser);
+        const doc = currentUser as any;
+        setUser({
+          $id: doc.$id,
+          userId: doc.userId,
+          email: doc.email,
+          likedAudios: doc.likedAudios || [],
+        });
       } catch(error) {
         console.log("User fetch error : ", error);
         setUser(null);
@@ -122,6 +133,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
       }
       setLikesLoading(true);
       try{
+        if(!user?.$id) return;
         const data = await getLikedSongs(user.$id);
         setLikedSongs(data || []);
       } catch(error) {
@@ -135,7 +147,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
   }, [user]);
 
   const handleToggleLike = async (songId: string) => {
-    if(!user) return;
+    if(!user?.$id) return;
     const updated = await toggleLike(user.$id, songId);
     setLikedSongs(updated);
   };
@@ -173,7 +185,14 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
         currentUser = res.documents[0];
       }
 
-      setUser(currentUser);
+      const doc = currentUser as any;
+
+      setUser({
+      $id: doc.$id,
+      userId: doc.userId,
+      email: doc.email,
+      likedAudios: doc.likedAudios || [],
+    });
     } finally {
       setLoading(false);
     }
@@ -194,7 +213,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
         userId: doc.userId,
         songIds: doc.songIds || [],
         coverImage: doc.coverImage,
-        $createdAt: doc.$createdSAt,
+        $createdAt: doc.$createdAt,
         $updatedAt: doc.$updatedAt,
       }));
       setPlaylists(formatted);

@@ -3,7 +3,7 @@ import { Account, Client, Databases, ID, Query } from "react-native-appwrite";
 const client = new Client()
   .setEndpoint(process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!)
   .setProject(process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!)
-  .setPlatform(process.env.EXPO_PUBLIC_APPWRITE_PROJECT_NAME!);
+  .setPlatform("com.vikash_4ever.Rhymes");
 
 export const account = new Account(client);
 export const databases = new Databases(client);
@@ -45,7 +45,7 @@ export const toggleLike = async (userDocId: string, songId: string) => {
     if (liked.includes(songId)) {
       liked = liked.filter((id: string) => id !== songId);
     } else{
-      liked.push(songId);
+      liked = [songId, ...liked];
     }
 
     await databases.updateDocument(
@@ -106,7 +106,7 @@ export const toggleSongInPlaylist = async (
   if (songs.includes(songId)) {
     songs = songs.filter((id: string) => id !== songId);
   } else {
-    songs.push(songId);
+    songs = [songId, ...songs];
   }
 
   await databases.updateDocument(
