@@ -45,6 +45,8 @@ export default function PlayingScreen() {
   const [isSliding, setIsSliding] = useState(false);
   const [slideValue, setSlideValue] = useState(0);
 
+  const [showOptions, setShowOptions] = useState(false);
+
   const handleLikePress = async () => {
     if (!currentTrack) return;
     const alreadyLiked = likedSongs.includes(currentTrack.id);
@@ -98,10 +100,34 @@ export default function PlayingScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowOptions(prev => !prev)}>
           <Image source={icons.option} tintColor="white" className="size-6 m-4" />
         </TouchableOpacity>
       </View>
+
+      {showOptions && (
+        <View className="absolute inset-0 z-50">
+          <TouchableOpacity
+            className="absolute inset-0"
+            activeOpacity={1}
+            onPress={() => setShowOptions(false)}
+          />
+
+          <View className="absolute top-16 right-4 bg-[#000000cc] rounded-xl p-4 w-auto shadow-lg elevation-10">
+            <TouchableOpacity className="py-2">
+              <Text className="text-white font-poppins-medium">Add to Playlist</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity className="py-2">
+              <Text className="text-white font-poppins-medium">Share</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity className="py-2">
+              <Text className="text-white font-poppins-medium">Go to Artist</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Album Art */}
       <View className="items-center mt-4 px-7">

@@ -1,6 +1,7 @@
 import icons from "@/constants/icons";
-import { createPlaylist, deletePlaylist } from "@/lib/appwrite";
+import { createPlaylist, deletePlaylist, renamePlaylist, updatePlaylistThumbnail } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
+import { pickAndCompressImage, uploadToCloudinary } from "@/lib/image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { Route } from "expo-router/build/Route";
@@ -18,6 +19,8 @@ const PlaylistsRoute = () => {
   const [playListName, setPlayListName] = React.useState("");
   const [optionsModal, setOptionsModal] = React.useState(false);
   const [selectedPlaylist, setSelectedPlaylist] = React.useState<any>(null);
+  const [renameModal, setRenameModal] = React.useState(false);
+  const [newName, setNewName] = React.useState("");
 
   const handleCreatePlaylist = async () => {
     if (!playListName.trim() || !user) return;
@@ -40,6 +43,21 @@ const PlaylistsRoute = () => {
       console.log("Delete Playlist Error:", error);
     }
   };
+
+  const handleThumbnailUpdate = async () => {
+  if (!selectedPlaylist?.$id) return;
+
+  const compressedUri = await pickAndCompressImage();
+  if (!compressedUri) return;
+
+  const imageUrl = await uploadToCloudinary(compressedUri);
+
+  await updatePlaylistThumbnail(selectedPlaylist.$id, imageUrl);
+  await loadPlaylists();
+
+  setOptionsModal(false);
+  setSelectedPlaylist(null);
+};
 
   if (loading || likesLoading) {
     return(
@@ -120,13 +138,12 @@ const PlaylistsRoute = () => {
                 onLongPress={() => {
                   setSelectedPlaylist(playlist);
                   setOptionsModal(true);
-                  
                 }}
                 delayLongPress={100}
                 className="flex flex-row mt-2 items-center"
               >
                 <View className="bg-gray-700 h-14 w-14 items-center justify-center">
-                  <Image source={playlist.coverImage || icons.disk} tintColor={"white"} className="size-6" />
+                  <Image source={playlist.coverImage ? {uri: playlist.coverImage} : icons.disk} className="size-14" />
                 </View>
 
                 <View className="pl-4 justify-center">
@@ -185,7 +202,7 @@ const PlaylistsRoute = () => {
                 setShowModal(false);
                 setPlayListName("");
               }}
-              className="py-2"
+              className="p-2"
             >
               <Text className="text-black text-lg font-poppins-semibold">
                 Cancel
@@ -203,17 +220,25 @@ const PlaylistsRoute = () => {
       visible={optionsModal}
       transparent
       animationType="fade"
-      onRequestClose={() => setOptionsModal(false)}
+      onRequestClose={() => {
+        setOptionsModal(false);
+        setSelectedPlaylist(null);
+        setNewName("");
+      }}
     >
       <TouchableOpacity 
         activeOpacity={1}
-        onPress={() => setOptionsModal(false)}
+        onPress={() => {
+          setOptionsModal(false);
+          setSelectedPlaylist(null);
+          setNewName("");
+        }}
         className="flex-1 justify-end bg-[#00000080]"
       >
         <TouchableOpacity 
           activeOpacity={1}
           onPress={() => {}}
-          className="bg-gray-700 rounded-t-2xl px-6 py-6"
+          className="bg-[#000000cc] rounded-t-2xl px-6 py-6"
         >
           <Text className="text-white text-xl self-center font-poppins-semibold mb-4">
             {selectedPlaylist?.name}
@@ -224,6 +249,8 @@ const PlaylistsRoute = () => {
             onPress={async () => {
               await handleDeletePlaylist(selectedPlaylist?.$id);
               setOptionsModal(false);
+              setSelectedPlaylist(null);
+              setNewName("");
             }}
             className="py-3"
           >
@@ -235,8 +262,10 @@ const PlaylistsRoute = () => {
           {/* RENAME */}
           <TouchableOpacity
             onPress={() => {
+              if(!selectedPlaylist) return;
               setOptionsModal(false);
-              // later implement rename modal
+              setRenameModal(true);
+              setNewName(selectedPlaylist?.name || "");
             }}
             className="py-3"
           >
@@ -265,7 +294,17 @@ const PlaylistsRoute = () => {
 
           {/* THUMBNAIL */}
           <TouchableOpacity
-            onPress={() => {
+            onPress={async () => {
+              if (!selectedPlaylist?.$id) return;
+
+              const uri = await pickAndCompressImage();
+              if (!uri) return;
+
+              const imageUrl = await uploadToCloudinary(uri);
+
+              await updatePlaylistThumbnail(selectedPlaylist.$id, imageUrl);
+              await loadPlaylists();
+
               setOptionsModal(false);
             }}
             className="py-3"
@@ -275,7 +314,12 @@ const PlaylistsRoute = () => {
 
           {/* CANCEL */}
           <TouchableOpacity
-            onPress={() => setOptionsModal(false)}
+            onPress={() => {
+              setOptionsModal(false);
+              setSelectedPlaylist(null);
+              setNewName("");
+
+            }}
             className="py-4 mt-2"
           >
             <Text className="text-center text-gray-500 text-lg font-poppins-medium">
@@ -284,6 +328,71 @@ const PlaylistsRoute = () => {
           </TouchableOpacity>
         </TouchableOpacity>
       </TouchableOpacity>
+    </Modal>
+    <Modal visible={renameModal}
+      transparent
+      onRequestClose={() => {
+        setRenameModal(false);
+        setSelectedPlaylist(null);
+        setNewName("");
+      }}
+    >
+      <View className="flex h-full justify-center items-center bg-black/50">
+        <View className="flex w-[80%] bg-white items-center rounded-lg py-4 px-4">
+  
+          <Text className="text-black text-2xl font-poppins-semibold my-4">
+            Rename Playlist
+          </Text>
+
+          <TextInput
+            value={newName}
+            onChangeText={setNewName}
+            placeholder="Enter playlist name"
+            placeholderTextColor="#9ca3af"
+            className="w-full border border-gray-300 rounded-md px-4 py-3 text-black mt-2"
+          />
+
+          <View className="flex-col items-center gap-4 mt-6 mb-2 w-full">
+
+            <TouchableOpacity
+              onPress={async () => {
+                if(!selectedPlaylist?.$id || !newName.trim()) return;
+                
+                await renamePlaylist(selectedPlaylist.$id, newName.trim());
+                await loadPlaylists();
+
+                setRenameModal(false);
+                setOptionsModal(false);
+                setSelectedPlaylist(null);
+                setNewName("");
+              }}
+              disabled={!newName.trim()}
+              className={`w-full rounded-full items-center justify-center ${
+                newName.trim() ? "bg-primary-300" : "bg-gray-600"
+              }`}
+            >
+              <Text className="text-white text-lg px-8 py-3 font-poppins-semibold">
+                Save
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                setRenameModal(false);
+                setSelectedPlaylist(null);
+                setNewName("");
+              }}
+              className="p-2"
+            >
+              <Text className="text-black text-lg font-poppins-semibold">
+                Cancel
+              </Text>
+            </TouchableOpacity>
+
+          </View>
+
+        </View>
+      </View>
     </Modal>
     </>
   );

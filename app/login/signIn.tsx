@@ -1,6 +1,6 @@
 import icons from "@/constants/icons";
 import images from "@/constants/images";
-import { config, databases, ID } from "@/lib/appwrite";
+import { account, config, databases, ID } from "@/lib/appwrite";
 import { loginWithGoogle } from "@/lib/auth";
 import { useGlobalContext } from "@/lib/global-provider";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,8 +18,7 @@ const slides = [
 export default function SignIN() {
   const [index, setIndex] = useState(0);
   const translateX = useRef(new Animated.Value(0)).current;
-  const { user } = useGlobalContext();
-  const {refreshUser} = useGlobalContext();
+  const { user, refreshUser } = useGlobalContext();
 
   useEffect(() =>{
     if(user) {
@@ -56,10 +55,14 @@ export default function SignIN() {
   // Google OAuth login
   const handleGoogleLogin = async () => {
     try {
-      const loggedInUser = await loginWithGoogle();
+      const success = await loginWithGoogle();
 
-      if (loggedInUser) {
-        console.log("✅ LoggedIn User:", loggedInUser);
+      if (!success) return;
+
+      const loggedInUser = await account.get();
+
+      console.log("✅ LoggedIn User:", loggedInUser);
+
         const existingUsers = await databases.listDocuments(
           config.databaseId,
           config.usersCollectionId,
@@ -88,7 +91,6 @@ export default function SignIN() {
         }
         await refreshUser();
         router.replace("/(root)/(tabs)"); // Use replace to prevent going back
-      }
     } catch (err) {
       console.error("❌ Google login error:", err);
     }

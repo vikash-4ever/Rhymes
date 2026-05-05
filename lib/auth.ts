@@ -1,4 +1,3 @@
-// lib/auth.ts
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { openAuthSessionAsync } from "expo-web-browser";
@@ -9,7 +8,7 @@ WebBrowser.maybeCompleteAuthSession();
 // Function to handle Google OAuth login flow
 export async function loginWithGoogle() {
   try {
-    const redirectUri = Linking.createURL('');
+    const redirectUri = Linking.createURL('/');
     console.log("Redirect URI : ", redirectUri);
 
     const response = await account.createOAuth2Token(
@@ -18,7 +17,7 @@ export async function loginWithGoogle() {
     );
 
     if (!response) {
-      throw new Error("Failed to get OAuth URL")
+      throw new Error("Failed to get OAuth URL");
     }
 
     const browserResult = await openAuthSessionAsync(
@@ -28,23 +27,20 @@ export async function loginWithGoogle() {
 
     if (browserResult.type !== 'success') throw new Error('Login failed');
 
-    if (!browserResult.url) {
-      throw new Error("No redirect URL received")
-    }
-
     const url = new URL(browserResult.url);
 
-    const secret = url.searchParams.get('secret');
-    const userId = url.searchParams.get('userId');
+    const secret = url.searchParams.get('secret')?.toString();
+    const userId = url.searchParams.get('userId')?.toString();
 
     if (!secret || !userId) throw new Error('Missing params');
 
-    await account.createSession(userId, secret);
+    const session = await account.createSession(userId, secret);
+    if (!session) throw new Error("Session creation failed!");
 
-    return await account.get();
+    return true;
   } catch (error) {
     console.error(error);
-    return null;
+    return false;
   }
 }
 

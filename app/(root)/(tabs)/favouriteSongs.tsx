@@ -7,8 +7,9 @@ import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Image, Modal, Text, TouchableOpacity, View } from "react-native";
+import ImageColors from "react-native-image-colors";
 
 export default function FavouriteSongs(){
 
@@ -21,8 +22,34 @@ export default function FavouriteSongs(){
     const [selectedSong, setSelectedSong] = useState<Song | null>(null);
     const prevIdsRef = useRef<string[]>([]);
     const scrollY = useState(new Animated.Value(0))[0];
-
+    const playlist = playlists.find(p => p.$id === id);
     const isLiked = selectedSong ? likedSongs.includes(selectedSong.id) : false;
+    const [gradientColors, setGradientColors] = React.useState<readonly[string, string]>([
+        "#5753a0",
+        "#000000"
+    ]);
+
+    const extractColors = async (uri: string) => {
+        try {
+            if (!uri) return;
+
+            const result = await ImageColors.getColors(uri, {
+                fallback: "#5753a0",
+            });
+
+            if (!result) return;
+
+            if (result.platform === "android") {
+                setGradientColors([result.dominant || "#5753a0", result.average || "#000000"] as const);
+            } else if(result.platform === "ios"){
+                setGradientColors([result.background || "#5753a0", result.primary || "#000000"] as const);
+            } else {
+                setGradientColors(["#5753a0", "#000000"] as const)
+            }
+        } catch (error) { 
+            console.log("Color extract error : ", error);
+        }
+    }
 
     let sourceIds: string[] = [];
     let isArtist = false;
@@ -55,6 +82,12 @@ export default function FavouriteSongs(){
         outputRange: [1, 0],
         extrapolate: "clamp",
     });
+
+    React.useEffect(() => {
+        if (playlist?.coverImage) {
+            extractColors(playlist.coverImage);
+        }
+    },[playlist?.coverImage]);
 
     useEffect(() => {
 
@@ -98,7 +131,7 @@ export default function FavouriteSongs(){
     return(
         <View className="flex-1 bg-black">
             <LinearGradient
-                colors={["#5753a0", "#000000"]}
+                colors={[type === "playlist" ? gradientColors[0] : "#575ca0", "#000000"]}
                 start={{ x: 0.1, y: 0.1 }}
                 end={{ x: 0.1, y: 0.7 }}
                 className="absolute inset-0"
@@ -116,13 +149,22 @@ export default function FavouriteSongs(){
                 }}
             >
                 <View className="h-48 w-48 mt-12 items-center justify-center">
-                    <LinearGradient
-                        colors={["#bdc4d4", "#3f3a9b"]}
-                        start={{ x: 0.1, y: 0.1 }}
-                        end={{ x: 1, y: 1 }}
-                        style={{ flex: 1, width: "100%" }}
-                    />
-                    <Image source={icons.heartFilled} tintColor={"white"} className="absolute size-16"/>
+                    {type === "playlist" && playlist?.coverImage ? (
+                        <Image
+                            source={{uri: playlist.coverImage}}
+                            className="h-full w-full rounded-sm"
+                        />
+                    ) : (
+                        <>
+                            <LinearGradient
+                                colors={["#bdc4d4", "#3f3a9b"]}
+                                start={{ x: 0.1, y: 0.1 }}
+                                end={{ x: 1, y: 1 }}
+                                style={{ flex: 1, width: "100%" }}
+                            />
+                            <Image source={icons.heartFilled} tintColor={"white"} className="absolute size-16"/>
+                        </>
+                    )}
                 </View>
             </Animated.View>
 

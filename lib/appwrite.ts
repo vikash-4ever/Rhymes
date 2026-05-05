@@ -1,19 +1,23 @@
 import { Account, Client, Databases, ID, Query } from "react-native-appwrite";
 
-const client = new Client()
-  .setEndpoint(process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!)
-  .setProject(process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!)
-  .setPlatform("com.vikash_4ever.Rhymes");
+
+export const config = {
+  platform: 'com.vishw.rhymes',
+  databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+  usersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID!,
+  playlistsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_PLAYLISTS_COLLECTION_ID!,
+  endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!,
+  projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
+};
+ 
+const client = new Client();
+client
+  .setEndpoint(config.endpoint)
+  .setProject(config.projectId);
 
 export const account = new Account(client);
 export const databases = new Databases(client);
 export { ID, Query };
-
-export const config = {
-  databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
-  usersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID!,
-  playlistsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_PLAYLISTS_COLLECTION_ID!,
-};
 
 export const getCurrentUser = async () => {
   try{
@@ -81,6 +85,31 @@ export const deletePlaylist = async (playlistId: string) => {
     playlistId
   )
 }
+
+export const renamePlaylist = async (playlistId: string, newName: string) => {
+  try {
+    await databases.updateDocument(
+      config.databaseId,
+      config.playlistsCollectionId,
+      playlistId,
+      { name: newName }
+    );
+  } catch (err) {
+    console.log("Rename error:", err);
+  }
+};
+
+export const updatePlaylistThumbnail = async (
+  playlistId: string,
+  imageUrl: string
+) => {
+  await databases.updateDocument(
+    config.databaseId,
+    config.playlistsCollectionId,
+    playlistId,
+    { coverImage: imageUrl }
+  );
+};
 
 export const getUserPlaylists = async (userId: string) => {
   const res = await databases.listDocuments(
