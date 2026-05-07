@@ -1,6 +1,6 @@
 import icons from "@/constants/icons";
 import images from "@/constants/images";
-import { getArtists, getRecentSongs, getTrendingSongs } from "@/lib/api/musicApis";
+import { getArtistImage, getArtists, getRecentSongs, getTrendingSongs } from "@/lib/api/musicApis";
 import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
@@ -16,6 +16,7 @@ export default function Index() {
   const [artists, setArtists] = useState<string[]>([]);
   const [loadingHome, setLoadingHome] = useState(true);
   const {playQueue} = usePlayer();
+  const [artistImages, setArtistImages] = useState<Record<string, string>>({});
 
   // trying to add local cache for popular & recommendations
   const CACHE_KEY = "HOME_CACHE";
@@ -25,6 +26,7 @@ export default function Index() {
   useEffect(() => {
     const loadHomeData = async () => {
       try {
+        await AsyncStorage.removeItem("HOME_CACHE");
         const cached = await AsyncStorage.getItem(CACHE_KEY);
 
         if (cached) {
@@ -34,7 +36,8 @@ export default function Index() {
           if (isValid) {
             setTrendingSongs(parsed.trending);
             setRecentSongs(parsed.recent);
-            setArtists(parsed.artists || [])
+            setArtists(parsed.artists || []);
+            setArtistImages(parsed.artistImages || {});
             setLoadingHome(false);
             return;
           }
@@ -64,6 +67,18 @@ export default function Index() {
         setRecentSongs(recentRes || []);
         setArtists(topArtists);
 
+        const imagesMap: Record<string, string> = {};
+
+        for(const artist of topArtists) {
+          const image = await getArtistImage(artist);
+          
+          if(image) {
+            imagesMap[artist] = image;
+          }
+        }
+
+        setArtistImages(imagesMap);
+
         await AsyncStorage.setItem(
           CACHE_KEY,
           JSON.stringify({
@@ -71,6 +86,7 @@ export default function Index() {
             trending: trendingRes || [],
             recent: recentRes || [],
             artists: topArtists,
+            artistImages: imagesMap,
           })
         );
 
@@ -219,11 +235,21 @@ export default function Index() {
               params: {
                 type: "artist",
                 title: artist,
-                artist: artist
+                artist: artist,
+                image: artistImages[artist] || "", 
               }
             })}
             className="mr-4 h-48 w-40 items-center">
-            <Image source={images.image1} className="h-40 w-40 rounded-full"/>
+            <Image 
+              source={
+                artistImages[artist]
+                  ? { uri: artistImages[artist] }
+                  : images.image2
+              }
+              onError={() => console.log("Image Failed.", artist)}
+              resizeMode="cover"
+              className="h-40 w-40 rounded-full"
+            />
             <Text className="text-text1 text-md font-poppins-semibold mt-2 text-center" numberOfLines={2} ellipsizeMode="tail">
               {artist}
             </Text>

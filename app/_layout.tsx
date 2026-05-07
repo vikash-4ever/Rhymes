@@ -8,7 +8,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import "../global.css";
 
 function RootNavigator() {
-  const { user, loading } = useGlobalContext();
+  const { user, loading, isGuestMode } = useGlobalContext();
 
   if (loading) {
     return (
@@ -20,11 +20,14 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {user ? (
+      <Stack.Protected guard={!!user || isGuestMode}>
         <Stack.Screen name="(root)" />
-      ) : (
+      </Stack.Protected>
+      
+      <Stack.Protected guard={!user && !isGuestMode}>
         <Stack.Screen name="login/signIn" />
-      )}
+      </Stack.Protected>
+      
     </Stack>
   );
 }

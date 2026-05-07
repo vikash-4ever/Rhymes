@@ -5,7 +5,7 @@ import { usePlayer } from "@/lib/PlayerContext";
 import { Slider } from "@miblanchard/react-native-slider";
 import { useAudioPlayerStatus } from "expo-audio";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import ImageColors from "react-native-image-colors";
 
 const fmt = (sec: number) => {
   if (!sec || sec < 0) return "00:00";
@@ -22,6 +23,8 @@ const fmt = (sec: number) => {
 };
 
 export default function PlayingScreen() {
+
+  
   const {
     currentTrack,
     isPlaying,
@@ -36,6 +39,29 @@ export default function PlayingScreen() {
     setRepeatMode
   } = usePlayer();
 
+  useEffect(() => {
+    const extractColor = async () => {
+      try {
+        if(!currentTrack?.thumbnail_url) return;
+
+        const result = await ImageColors.getColors(currentTrack.thumbnail_url, {
+          fallback: "#000000",
+        });
+
+        if (result.platform === "android") {
+          setBgColor(result.dominant || "#000000");
+        } else if (result.platform === "ios") {
+          setBgColor(result.background || "#000000");
+        } else {
+          setBgColor("#000000")
+        }
+      } catch (error) {
+        console.log("Color Error : ", error)
+      }
+    };
+    extractColor();
+  }, [currentTrack]);
+
   const {likedSongs, setLikedSongs, handleToggleLike} = useGlobalContext();
 
   const { currentTime = 0, duration = 0, isBuffering = false } =
@@ -44,6 +70,7 @@ export default function PlayingScreen() {
   const isLiked = currentTrack ? likedSongs.includes(currentTrack!.id) : false;
   const [isSliding, setIsSliding] = useState(false);
   const [slideValue, setSlideValue] = useState(0);
+  const [bgColor, setBgColor] = useState("#000000");
 
   const [showOptions, setShowOptions] = useState(false);
 
@@ -84,7 +111,7 @@ export default function PlayingScreen() {
   };
 
   return (
-    <View className="flex-1 bg-primary-200">
+    <View style={{flex: 1, backgroundColor: bgColor}}>
       {/* Header */}
       <View className="flex flex-row items-center justify-between mt-4 px-3">
         <TouchableOpacity onPress={() => router.back()}>
@@ -152,7 +179,7 @@ export default function PlayingScreen() {
             {currentTrack.title}
           </Text>
           <Text 
-            className="text-gray-400 font-poppins-regular" 
+            className="text-[#ffffff66] font-poppins-semibold" 
             numberOfLines={1}
           >
             {currentTrack.artists?.map((a) => a.name).join(", ")}
@@ -223,7 +250,7 @@ export default function PlayingScreen() {
           <View>
             <Image source={icons.repeat} tintColor={repeatMode === "off" ? "#ffffff38" : "white"} className="w-7 h-7" />
             {repeatMode === "one" && (
-              <Text className="absolute text-white font-poppins-bold bg-black text-xs bottom-0 right-0">
+              <Text className="absolute text-white font-poppins-bold bg-[#00000000] text-xs self-center mt-1">
                 1
               </Text>
             )}
@@ -231,9 +258,9 @@ export default function PlayingScreen() {
         </TouchableOpacity>
       </View>
 
-      <View className="flex-1 items-center justify-center">
+      <TouchableOpacity className="flex-1 items-center justify-center">
         <Image source={icons.soundWave} tintColor="white" className="size-8" />
-      </View>
+      </TouchableOpacity>
     </View>
   );
 }

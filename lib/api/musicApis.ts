@@ -82,6 +82,21 @@ export const getArtists = async () => {
   return res.json();
 };
 
+export const getArtistImage = async (artistName: string) => {
+  try {
+    const res = await fetch(
+      `${API_BASE}/artist-image/${encodeURIComponent(artistName)}`);
+
+    const data = await res.json();
+
+    return data?.image_url || null;
+    
+  } catch (error) {
+    console.log("Artist image error:", error);
+    return null;
+  }
+};
+
 /* ---------------- ALBUMS ---------------- */
 
 export const getSongsByAlbum = async (albumName: string) => {

@@ -13,8 +13,8 @@ import ImageColors from "react-native-image-colors";
 
 export default function FavouriteSongs(){
 
-    const {playQueue} = usePlayer();
-    const {type, id, title, artist} = useLocalSearchParams();
+    const {playQueue, playShuffledQueue} = usePlayer();
+    const {type, id, title, artist, image} = useLocalSearchParams();
     const {user, likedSongs, setLikedSongs, playlists, loadPlaylists} = useGlobalContext();
     const [songs, setSongs] = useState<Song[]>([]);
     const [songsLoading, setSongsLoading] = useState(false);
@@ -84,10 +84,14 @@ export default function FavouriteSongs(){
     });
 
     React.useEffect(() => {
-        if (playlist?.coverImage) {
+        if (type === "playlist" && playlist?.coverImage) {
             extractColors(playlist.coverImage);
         }
-    },[playlist?.coverImage]);
+
+        if (type === "artist" && image) {
+            extractColors(image as string);
+        }
+    },[playlist?.coverImage, type, image]);
 
     useEffect(() => {
 
@@ -131,7 +135,7 @@ export default function FavouriteSongs(){
     return(
         <View className="flex-1 bg-black">
             <LinearGradient
-                colors={[type === "playlist" ? gradientColors[0] : "#575ca0", "#000000"]}
+                colors={[gradientColors[0], "#000000"]}
                 start={{ x: 0.1, y: 0.1 }}
                 end={{ x: 0.1, y: 0.7 }}
                 className="absolute inset-0"
@@ -153,6 +157,12 @@ export default function FavouriteSongs(){
                         <Image
                             source={{uri: playlist.coverImage}}
                             className="h-full w-full rounded-sm"
+                        />
+                    ) : type === "artist" && image ? (
+                        <Image
+                            source={{ uri: image as string }}
+                            className="h-full w-full rounded-full"
+                            resizeMode="cover"
                         />
                     ) : (
                         <>
@@ -185,16 +195,17 @@ export default function FavouriteSongs(){
                     top: "36%",
                     alignSelf: "center",
                     opacity: imageOpacity,
-                    transform: [{translateY: textTranslateY}]
+                    transform: [{translateY: textTranslateY}],
+                    zIndex: 999,
+                    elevation: 999
                 }}
             >
                 <TouchableOpacity 
                     onPress={async () => {
                         if(songs.length === 0) return;
-                        const randomIndex = Math.floor(Math.random()*songs.length);
-                        await playQueue(songs, randomIndex);
+                        await playShuffledQueue(songs);
                     }}
-                    className="absolute top-[40%] self-center rounded-full bg-black items-center justify-center mt-8 z-10">
+                    className="self-center rounded-full bg-black items-center justify-center mt-8 z-10">
                     <Text className="text-white text-lg font-poppins-semibold py-4 px-8">Shuffle play</Text>
                 </TouchableOpacity>
             </Animated.View>

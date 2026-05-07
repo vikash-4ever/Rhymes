@@ -4,16 +4,16 @@ import { usePlayer } from "@/lib/PlayerContext";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Image, Modal, Text, TouchableOpacity, View } from "react-native";
-import { Models } from "react-native-appwrite";
 
-type AppUser = Models.Document & {
+type AppUser = {
     email?: string;
     name?: string;
-};
+    isGuest?: boolean;
+} | null;
 
 export default function SettingsScreen() {
     const {user, logout} = useGlobalContext();
-    const appUser = user as AppUser;
+    const appUser = user as unknown as AppUser;
     const [showModal, setShowModal] = useState(false);
     const {resetPlayer} = usePlayer();
 

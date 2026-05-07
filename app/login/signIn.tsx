@@ -3,6 +3,7 @@ import images from "@/constants/images";
 import { account, config, databases, ID } from "@/lib/appwrite";
 import { loginWithGoogle } from "@/lib/auth";
 import { useGlobalContext } from "@/lib/global-provider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -18,7 +19,7 @@ const slides = [
 export default function SignIN() {
   const [index, setIndex] = useState(0);
   const translateX = useRef(new Animated.Value(0)).current;
-  const { user, refreshUser } = useGlobalContext();
+  const { user, refreshUser, loginAsGuest } = useGlobalContext();
 
   useEffect(() =>{
     if(user) {
@@ -89,6 +90,8 @@ export default function SignIN() {
         } else {
           console.log("ℹ️ User already exists in DB");
         }
+        await AsyncStorage.removeItem("guestMode");
+
         await refreshUser();
         router.replace("/(root)/(tabs)"); // Use replace to prevent going back
     } catch (err) {
@@ -137,7 +140,14 @@ export default function SignIN() {
           ))}
         </View>
 
-        <View className="mt-[70%] px-8">
+        <View className="mt-[55%] px-8">
+          <TouchableOpacity 
+            onPress={loginAsGuest}
+            className="items-center justify-center mb-10"
+          >
+            <Text className="font-poppins-medium text-white">Wanna try it? 🎧</Text>
+          </TouchableOpacity>
+ 
           <TouchableOpacity
             onPress={handleGoogleLogin}
             className="flex-row border border-white rounded-full py-3 px-8 justify-between items-center"

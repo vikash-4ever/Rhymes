@@ -21,6 +21,7 @@ type PlayerContextType = {
   stopTrack: () => Promise<void>;
   resetPlayer: () => Promise<void>;
   seekTo: (seconds: number) => Promise<void>;
+  playShuffledQueue: (songs: Song[]) => Promise<void>;
 
   setIsShuffle: React.Dispatch<React.SetStateAction<boolean>>;
   setRepeatMode: React.Dispatch<React.SetStateAction<"off" | "one" | "all">>;
@@ -189,6 +190,28 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
     } catch {}
   };
 
+  // Shuffle function for playlists
+  const shuffleArray = (array: Song[]) => {
+    return [...array].sort(() => Math.random() - 0.5);
+  };
+
+  // Shuffle Queue for playlists
+  const playShuffledQueue = async (songs: Song[]) => {
+  try {
+    const shuffled = shuffleArray(songs);
+
+    setQueue(shuffled);
+    setCurrentIndex(0);
+    setCurrentTrack(shuffled[0]);
+
+    addToRecentlyPlayed(shuffled[0]);
+
+    setAudioSource(shuffled[0].audio_url);
+  } catch (error) {
+    console.warn("playShuffledQueue error!", error);
+  }
+};
+
   useEffect(() => {
     if (!status) return;
     
@@ -229,6 +252,7 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
         stopTrack,
         resetPlayer,
         seekTo,
+        playShuffledQueue,
 
         setIsShuffle,
         setRepeatMode

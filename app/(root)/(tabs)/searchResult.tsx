@@ -7,8 +7,9 @@ import { Song } from "@/types/song";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useLocalSearchParams } from "expo-router/build/hooks";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
+import ImageColors from "react-native-image-colors";
 
 export default function SearchResult() {
   const { result, queue, index } = useLocalSearchParams();
@@ -16,11 +17,36 @@ export default function SearchResult() {
   const songQueue: Song[] = queue ? JSON.parse(queue as string) : null;
   const currentIndex = index ? Number(index): 0;
 
+  const [bgColor, setBgColor] = useState("#000000");
+
   const {likedSongs, setLikedSongs, handleToggleLike} =useGlobalContext();
   const {playQueue ,playTrack, togglePlayPause, currentTrack, isPlaying} = usePlayer();
   const title = song?.title || "Unknown Title";
   const artist = song?.artists?.map((a) => a.name).join(", ") || "Unknown Artist";
   const thumbnail = song?.thumbnail_url;
+
+  useEffect(() => {
+    const extractColor = async () => {
+      try{
+        if(!thumbnail) return;
+
+        const result = await ImageColors.getColors(thumbnail, {
+          fallback: "#000000",
+        });
+
+        if (result.platform === "android") {
+          setBgColor(result.dominant || "#000000");
+        } else if (result.platform === "ios") {
+          setBgColor(result.background || "#000000");
+        } else {
+          setBgColor("#000000");
+        }
+      } catch (error) {
+        console.log("Color Error : ", error);
+      }
+    };
+    extractColor();
+  },[thumbnail]);
 
   const isCurrentSong = currentTrack?.id === song?.id;
 
@@ -46,6 +72,8 @@ export default function SearchResult() {
     if(!song) return;
     await handleToggleLike(song.id);
   }
+
+  
 
   return (
     <View className="flex-1 bg-black w-full items-center justify-center">
@@ -96,7 +124,7 @@ export default function SearchResult() {
 
       {/* Background */}
       <LinearGradient
-        colors={["#1c2e4aff", "#000000cc"]}
+        colors={[bgColor, "#000000cc"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         className="absolute top-0 left-0 right-0 h-[360]"

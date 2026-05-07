@@ -11,15 +11,18 @@ type UserProfile = {
   userId: string;
   email: string;
   likedAudios: string[];
+  isGuest?: boolean;
 } | null;
 
 type GlobalContextType = {
   user: UserProfile;
   loading: boolean;
   likesLoading: boolean;
+  isGuestMode: boolean;
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>;
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
+  loginAsGuest: () => Promise<void>;
 
   recentlyPlayed: Song[];
   likedSongs: string[];
@@ -41,14 +44,38 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
   const [recentlyPlayed, setRecentlyPlayed] = useState<Song[]>([]);
   const [likedSongs, setLikedSongs] = useState<string[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [isGuestMode, setIsGuestMode] = useState(false);
+  
 
   useEffect(() => {
     const loadUser = async () => {
+
       try {
+
+        const isGuest = await AsyncStorage.getItem("guestMode");
+        if (isGuest === "true") {
+
+          setIsGuestMode(true);
+
+          setUser({
+            $id: "guest",
+            userId: "guest",
+            email: "Guest",
+            likedAudios: [],
+            isGuest: true,
+          });
+          setLoading(false);
+          return;
+        }
+
         const session = await account.get().catch(() => null);
+
+        console.log("GuestMode:", isGuest);
+        console.log("Session:", session);
 
         if (!session) {
           setUser(null);
+          setLoading(false);
           return;
         }
 
@@ -110,13 +137,19 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
-      const session = await account.get().catch(() => null);
-      if(session) {
+      try {
         await account.deleteSession("current");
+      } catch (e) {
+        console.log("Current session delete failed");
       }
-      setUser(null);
 
-      await AsyncStorage.multiRemove(["recentlyPlayed"]);
+      await account.deleteSessions().catch(() => {});
+
+      setUser(null);
+      setIsGuestMode(false);
+
+      await AsyncStorage.multiRemove(["recentlyPlayed", "guestMode"]);
+      router.dismissAll();
       router.replace("/login/signIn");
       console.log("Clean Logout Done!");
     } catch (error) {
@@ -145,6 +178,23 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
     };
     loadLikes();
   }, [user]);
+
+  const loginAsGuest = async () => {
+    const guestUser = {
+      $id: "guest",
+      userId: "guest",
+      email: "Guest",
+      likedAudios: [],
+      isGuest: true,
+    };
+
+    setUser(guestUser);
+    setIsGuestMode(true);
+    
+    await AsyncStorage.setItem("guestMode", "true");
+
+    router.replace("/(root)/(tabs)");
+  };
 
   const handleToggleLike = async (songId: string) => {
     if(!user?.$id) return;
@@ -247,6 +297,8 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
         playlists,
         setPlaylists,
         loadPlaylists,
+        loginAsGuest,
+        isGuestMode,  
       }}
     >
       {children}
