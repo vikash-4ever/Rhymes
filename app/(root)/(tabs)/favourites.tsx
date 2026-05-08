@@ -90,7 +90,8 @@ const PlaylistsRoute = () => {
           onPress={() => router.push({
             pathname: "/favouriteSongs",
             params: {
-              type: "liked", title: "Favourite Songs"
+              type: "liked",
+              title: "Favourite Songs"
             }
           })}
           className="flex flex-row mt-2 items-center">
@@ -110,7 +111,13 @@ const PlaylistsRoute = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => router.push("/localAudio")}
+          onPress={() => router.push({
+            pathname: "/favouriteSongs",
+            params: {
+              type: "local",
+              title: "Local Audio Files",
+            }
+          })}
           className="flex flex-row mt-2 items-center"
         >
           <View className="bg-gray-500 h-14 w-14 items-center justify-center">

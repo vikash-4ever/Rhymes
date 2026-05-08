@@ -1,3 +1,4 @@
+import SongOptions from "@/components/SongOptions";
 import icons from "@/constants/icons";
 import images from "@/constants/images";
 import { useGlobalContext } from "@/lib/global-provider";
@@ -9,6 +10,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -134,25 +136,20 @@ export default function PlayingScreen() {
 
       {showOptions && (
         <View className="absolute inset-0 z-50">
+
           <TouchableOpacity
             className="absolute inset-0"
             activeOpacity={1}
             onPress={() => setShowOptions(false)}
           />
 
-          <View className="absolute top-16 right-4 bg-[#000000cc] rounded-xl p-4 w-auto shadow-lg elevation-10">
-            <TouchableOpacity className="py-2">
-              <Text className="text-white font-poppins-medium">Add to Playlist</Text>
-            </TouchableOpacity>
+          <ScrollView className="absolute h-90 bottom-0 left-0 right-0">
+            <SongOptions
+              song={currentTrack}
+              onClose={() => setShowOptions(false)}
+            />
+          </ScrollView>
 
-            <TouchableOpacity className="py-2">
-              <Text className="text-white font-poppins-medium">Share</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity className="py-2">
-              <Text className="text-white font-poppins-medium">Go to Artist</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       )}
 

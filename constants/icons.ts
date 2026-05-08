@@ -26,6 +26,8 @@ import setting from "@/assets/icons/setting.png";
 import shuffle from "@/assets/icons/shuffle.png";
 import sort from "@/assets/icons/sort.png";
 import soundWave from "@/assets/icons/soundWaves.png";
+import star from "@/assets/icons/star.png";
+import starFilled from "@/assets/icons/starFilled.png";
 
 export default {
     heart,
@@ -55,4 +57,6 @@ export default {
     repeat,
     down,
     soundWave,
+    star,
+    starFilled,
 }

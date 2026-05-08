@@ -6,6 +6,7 @@ export const config = {
   databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
   usersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID!,
   playlistsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_PLAYLISTS_COLLECTION_ID!,
+  editorsPickCollectionId: process.env.EXPO_PUBLIC_APPWRITE_EDITORS_PICK_COLLECTION_ID!,
   endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!,
   projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
 };
@@ -146,4 +147,46 @@ export const toggleSongInPlaylist = async (
   );
 
   return songs;
+};
+
+export const addEditorsPick = async (songId: string) => {
+  try {
+    return await databases.createDocument(
+      config.databaseId,
+      config.editorsPickCollectionId,
+      ID.unique(),
+      {
+        songId,
+      }
+    );
+  } catch (error) {
+    console.log("Add Editors Pick Error:", error);
+  }
+};
+
+export const getEditorsPick = async () => {
+  try {
+    const res = await databases.listDocuments(
+      config.databaseId,
+      config.editorsPickCollectionId,
+      [Query.orderDesc("$createdAt")]
+    );
+
+    return res.documents;
+  } catch (error) {
+    console.log("Get Editors Pick Error:", error);
+    return [];
+  }
+};
+
+export const deleteEditorsPick = async (docId: string) => {
+  try {
+    await databases.deleteDocument(
+      config.databaseId,
+      config.editorsPickCollectionId,
+      docId
+    );
+  } catch (error) {
+    console.log("Delete Editors Pick Error:", error);
+  }
 };

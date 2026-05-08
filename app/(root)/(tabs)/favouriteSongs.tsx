@@ -1,7 +1,7 @@
 import SongItem from "@/components/SongItem";
+import SongOptions from "@/components/SongOptions";
 import icons from "@/constants/icons";
 import { getSongsByArtist, getSongsByIds } from "@/lib/api/musicApis";
-import { toggleLike, toggleSongInPlaylist } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
@@ -33,6 +33,7 @@ export default function FavouriteSongs(){
         try {
             if (!uri) return;
 
+            console.log("Image uri : ", uri);
             const result = await ImageColors.getColors(uri, {
                 fallback: "#5753a0",
             });
@@ -84,12 +85,22 @@ export default function FavouriteSongs(){
     });
 
     React.useEffect(() => {
+        if (type === "liked") {
+            setGradientColors(["#3f3a9b", "#000000"]);
+            return;
+        }
+
+        if (type === "local") {
+            setGradientColors(["#3f3f46", "#000000"]);
+            return;
+        }
+        setGradientColors(["#000000", "#000000"])
         if (type === "playlist" && playlist?.coverImage) {
             extractColors(playlist.coverImage);
         }
 
-        if (type === "artist" && image) {
-            extractColors(image as string);
+        if (type === "artist" && typeof image === "string" && image.length > 0) {
+            extractColors(image);
         }
     },[playlist?.coverImage, type, image]);
 
@@ -158,22 +169,34 @@ export default function FavouriteSongs(){
                             source={{uri: playlist.coverImage}}
                             className="h-full w-full rounded-sm"
                         />
-                    ) : type === "artist" && image ? (
+                    ) : type === "artist" &&
+                            typeof image === "string" &&
+                            image.length > 0 ? (
                         <Image
                             source={{ uri: image as string }}
                             className="h-full w-full rounded-full"
                             resizeMode="cover"
                         />
-                    ) : (
+                    ) : type === "local" ? (
                         <>
                             <LinearGradient
-                                colors={["#bdc4d4", "#3f3a9b"]}
+                                colors={["#bdc4d4", "#3f3f46"]}
                                 start={{ x: 0.1, y: 0.1 }}
                                 end={{ x: 1, y: 1 }}
                                 style={{ flex: 1, width: "100%" }}
                             />
-                            <Image source={icons.heartFilled} tintColor={"white"} className="absolute size-16"/>
+                            <Image source={icons.disk} tintColor={"white"} className="absolute size-16"/>
                         </>
+                    ) : (
+                            <>
+                                <LinearGradient
+                                    colors={["#bdc4d4", "#3f3a9b"]}
+                                    start={{ x: 0.1, y: 0.1 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={{ flex: 1, width: "100%" }}
+                                />
+                                <Image source={icons.heartFilled} tintColor={"white"} className="absolute size-16"/>
+                            </>
                     )}
                 </View>
             </Animated.View>
@@ -224,7 +247,7 @@ export default function FavouriteSongs(){
                 <Animated.ScrollView 
                     className="w-full mt-1"
                     style={{ transform: [{translateY: scrollTranslateY}]}}
-                    contentContainerStyle={{ paddingTop: 325, paddingBottom: 280}}
+                    contentContainerStyle={{ paddingTop: 325, paddingBottom: 660}}
                     showsVerticalScrollIndicator= {false}
                     onScroll={Animated.event(
                         [{nativeEvent: {contentOffset: {y: scrollY}}}],
@@ -260,69 +283,10 @@ export default function FavouriteSongs(){
                     onPress={() => setSongOptionsModal(false)}
                     className="flex-1 justify-end bg-[#00000080]"
                 >
-                    <TouchableOpacity
-                    activeOpacity={1}
-                    onPress={() => {}}
-                    className="bg-gray-700 rounded-t-2xl px-6 py-6"
-                    >
-                    <Text className="text-white text-xl self-center font-poppins-semibold mb-4">
-                        {selectedSong?.title}
-                    </Text>
-
-                    <TouchableOpacity
-                        onPress={async () => {
-                            if (!selectedSong || !user) return;
-
-                            const updated = await toggleLike(user.$id, selectedSong.id);
-                            setLikedSongs(updated);
-
-                            setSongOptionsModal(false);
-                        }}
-                        className="py-3"
-                    >
-                        <Text className="text-white text-lg font-poppins-medium">
-                            {isLiked ? "Remove from Favourite" : "Add to Favourite"}
-                        </Text>
-                    </TouchableOpacity>
-
-                    {/* PLAYLIST LIST */}
-                    {playlists.map((playlist) => {
-                        const isAdded = selectedSong ? (playlist.songIds || []).includes(selectedSong?.id) : false;
-
-                        return (
-                        <TouchableOpacity
-                            key={playlist.$id}
-                            onPress={async () => {
-                            if (!selectedSong) return;
-
-                            await toggleSongInPlaylist(
-                                playlist.$id,
-                                selectedSong.id
-                            );
-
-                            // UI update
-                            await loadPlaylists();
-
-                            setSongOptionsModal(false);
-                            }}
-                            className="py-3"
-                        >
-                            <Text className="text-white text-lg font-poppins-medium">
-                            {isAdded ? "Remove from " : "Add to "} {playlist.name}
-                            </Text>
-                        </TouchableOpacity>
-                        );
-                    })}
-
-                    <TouchableOpacity
-                        onPress={() => setSongOptionsModal(false)}
-                        className="py-4 mt-2"
-                    >
-                        <Text className="text-center text-gray-500 text-lg font-poppins-medium">
-                        Cancel
-                        </Text>
-                    </TouchableOpacity>
-                    </TouchableOpacity>
+                    <SongOptions
+                        song={selectedSong}
+                        onClose={() => setSongOptionsModal(false)}
+                    />
                 </TouchableOpacity>
                 </Modal>
         </View>

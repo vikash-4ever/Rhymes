@@ -1,6 +1,8 @@
 import icons from "@/constants/icons";
 import images from "@/constants/images";
 import { incrementPlay } from "@/lib/api/musicApis";
+import { addEditorsPick, deleteEditorsPick, getEditorsPick } from "@/lib/appwrite";
+import { ADMIN_ID } from "@/lib/config";
 import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
@@ -18,8 +20,11 @@ export default function SearchResult() {
   const currentIndex = index ? Number(index): 0;
 
   const [bgColor, setBgColor] = useState("#000000");
+  const [editorsPickDocId, setEditorsPickDocId] = useState<string | null>(null);
+  const [loadingEditorsPick, setLoadingEditorsPick] = useState(false);
+  const {likedSongs, setLikedSongs, handleToggleLike, user} =useGlobalContext();
+  const isAdmin = user?.$id === ADMIN_ID;
 
-  const {likedSongs, setLikedSongs, handleToggleLike} =useGlobalContext();
   const {playQueue ,playTrack, togglePlayPause, currentTrack, isPlaying} = usePlayer();
   const title = song?.title || "Unknown Title";
   const artist = song?.artists?.map((a) => a.name).join(", ") || "Unknown Artist";
@@ -48,6 +53,29 @@ export default function SearchResult() {
     extractColor();
   },[thumbnail]);
 
+  useEffect(() => {
+    const checkEditorsPick = async () => {
+      if (!song?.id || !isAdmin) return;
+
+      try {
+        const docs = await getEditorsPick();
+
+        const existing = docs.find(
+          (doc: any) => doc.songId === song.id
+        );
+
+        if (existing) {
+          setEditorsPickDocId(existing.$id);
+        }
+
+      } catch (error) {
+        console.log("Editors Pick Check Error:", error);
+      }
+    };
+
+    checkEditorsPick();
+  }, [song?.id]);
+
   const isCurrentSong = currentTrack?.id === song?.id;
 
   const buttonText = !isCurrentSong ? "Play" : isPlaying ? "Pause" : "Resume";
@@ -73,6 +101,35 @@ export default function SearchResult() {
     await handleToggleLike(song.id);
   }
 
+  const handleEditorsPick = async () => {
+    if (!song?.id || loadingEditorsPick) return;
+
+    try {
+      setLoadingEditorsPick(true);
+
+      if (editorsPickDocId) {
+
+        await deleteEditorsPick(editorsPickDocId);
+
+        setEditorsPickDocId(null);
+
+      } else {
+
+        const doc = await addEditorsPick(song.id);
+
+        if (doc?.$id) {
+          setEditorsPickDocId(doc.$id);
+        }
+      }
+
+    } catch (error) {
+      console.log("Editors Pick Toggle Error:", error);
+
+    } finally {
+      setLoadingEditorsPick(false);
+    }
+  };
+
   
 
   return (
@@ -94,6 +151,22 @@ export default function SearchResult() {
               className="size-6 m-5"
             />
           </TouchableOpacity>
+          {isAdmin && (
+            <TouchableOpacity
+              onPress={handleEditorsPick}
+              disabled={loadingEditorsPick}
+            >
+              <Image
+                source={
+                  editorsPickDocId
+                    ? icons.starFilled
+                    : icons.star
+                }
+                tintColor="white"
+                className="size-6 mr-5"
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

@@ -1,13 +1,16 @@
 import icons from "@/constants/icons";
 import images from "@/constants/images";
-import { getArtistImage, getArtists, getRecentSongs, getTrendingSongs } from "@/lib/api/musicApis";
+import { getArtistImage, getArtists, getRecentSongs, getSongsByIds, getTrendingSongs } from "@/lib/api/musicApis";
+import { getEditorsPick } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+
 
 export default function Index() {
   const {recentlyPlayed} = useGlobalContext();
@@ -17,88 +20,115 @@ export default function Index() {
   const [loadingHome, setLoadingHome] = useState(true);
   const {playQueue} = usePlayer();
   const [artistImages, setArtistImages] = useState<Record<string, string>>({});
+  const [editorsPickSongs, setEditorsPickSongs] = useState<Song[]>([]);
 
   // trying to add local cache for popular & recommendations
   const CACHE_KEY = "HOME_CACHE";
   const CACHE_TTL = 1000 * 60 * 60 * 12;
   //--------------------------------------
 
-  useEffect(() => {
-    const loadHomeData = async () => {
-      try {
-        await AsyncStorage.removeItem("HOME_CACHE");
-        const cached = await AsyncStorage.getItem(CACHE_KEY);
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadHomeData = async () => {
+        try {
+          let orderedEditorSongs: Song[] = [];
 
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          const isValid = Date.now() - parsed.time < CACHE_TTL;
+          const editorsPickDocs = await getEditorsPick();
 
-          if (isValid) {
-            setTrendingSongs(parsed.trending);
-            setRecentSongs(parsed.recent);
-            setArtists(parsed.artists || []);
-            setArtistImages(parsed.artistImages || {});
-            setLoadingHome(false);
-            return;
+          const editorSongIds = editorsPickDocs.map(
+            (doc: any) => doc.songId
+          );
+
+          if (editorSongIds.length > 0) {
+            const editorSongs = await getSongsByIds(editorSongIds);
+
+            const songMap = new Map(
+              editorSongs.map((song: Song) => [song.id, song])
+            );
+
+            orderedEditorSongs = editorSongIds
+              .map((id: string) => songMap.get(id))
+              .filter((s): s is Song => Boolean(s));
+
+            setEditorsPickSongs(orderedEditorSongs);
+          } else {
+            setEditorsPickSongs([]);
           }
-        }
 
-        const [trendingRes, recentRes, artistsRes] = await Promise.all([
-          getTrendingSongs(),
-          getRecentSongs(),
-          getArtists(),
-        ]);
+          const cached = await AsyncStorage.getItem(CACHE_KEY);
 
-        const artistCount: Record<string, number> = {};
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            const isValid = Date.now() - parsed.time < CACHE_TTL;
 
-        trendingRes.forEach((song: Song) => {
-          song.artists?.forEach((artist) => {
-            const name = artist.name;
-            artistCount[name] = (artistCount[name] || 0) +1;
+            if (isValid) {
+              setTrendingSongs(parsed.trending);
+              setRecentSongs(parsed.recent);
+              setArtists(parsed.artists || []);
+              setArtistImages(parsed.artistImages || {});
+              setLoadingHome(false);
+              return;
+            }
+          }
+
+          const [trendingRes, recentRes, artistsRes] = await Promise.all([
+            getTrendingSongs(),
+            getRecentSongs(),
+            getArtists(),
+          ]);
+
+          const artistCount: Record<string, number> = {};
+
+          trendingRes.forEach((song: Song) => {
+            song.artists?.forEach((artist) => {
+              const name = artist.name;
+              artistCount[name] = (artistCount[name] || 0) +1;
+            });
           });
-        });
 
-        const topArtists = Object.entries(artistCount)
-        .sort((a, b) => b[1] - a[1]) // descending
-        .slice(0, 15) // only top 10-15
-        .map(([name]) => name);
+          const topArtists = Object.entries(artistCount)
+          .sort((a, b) => b[1] - a[1]) // descending
+          .slice(0, 15) // only top 10-15
+          .map(([name]) => name);
 
-        setTrendingSongs(trendingRes || []);
-        setRecentSongs(recentRes || []);
-        setArtists(topArtists);
+          setTrendingSongs(trendingRes || []);
+          setRecentSongs(recentRes || []);
+          setArtists(topArtists);
 
-        const imagesMap: Record<string, string> = {};
+          const imagesMap: Record<string, string> = {};
 
-        for(const artist of topArtists) {
-          const image = await getArtistImage(artist);
-          
-          if(image) {
-            imagesMap[artist] = image;
+          for(const artist of topArtists) {
+            const image = await getArtistImage(artist);
+            
+            if(image) {
+              imagesMap[artist] = image;
+            }
           }
+
+          setArtistImages(imagesMap);
+
+          await AsyncStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify({
+              time: Date.now(),
+              trending: trendingRes || [],
+              recent: recentRes || [],
+              artists: topArtists,
+              artistImages: imagesMap,
+            })
+          );
+
+        } catch (error) {
+          console.log("Home load error", error);
+        } finally {
+          setLoadingHome(false);
         }
+      };
 
-        setArtistImages(imagesMap);
-
-        await AsyncStorage.setItem(
-          CACHE_KEY,
-          JSON.stringify({
-            time: Date.now(),
-            trending: trendingRes || [],
-            recent: recentRes || [],
-            artists: topArtists,
-            artistImages: imagesMap,
-          })
-        );
-
-      } catch (error) {
-        console.log("Home load error", error);
-      } finally {
-        setLoadingHome(false);
-      }
-    };
-
-    loadHomeData();
-  }, []);
+      loadHomeData();
+      return () => {};
+    }, [])
+  );
 
   if (loadingHome) {
   return (
@@ -202,24 +232,28 @@ export default function Index() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="ml-4">
-        <TouchableOpacity className="mr-4">
-          <Image source={images.image1} className="h-44 w-44 rounded-sm"/>
-          <Text className="text-text1 text-md font-poppins-semibold mt-2" numberOfLines={2} ellipsizeMode="tail">
-            Title
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="mr-4">
-          <Image source={images.image1} className="h-44 w-44"/>
-          <Text className="text-text1 text-md font-bold mt-2" numberOfLines={2} ellipsizeMode="tail">
-            Title
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="mr-4">
-          <Image source={images.image1} className="h-44 w-44"/>
-          <Text className="text-text1 text-md font-bold mt-2" numberOfLines={2} ellipsizeMode="tail">
-            Title
-          </Text>
-        </TouchableOpacity>
+        {editorsPickSongs.map((item, index) => (
+          <TouchableOpacity 
+            key={item.id ?? index}
+            className="w-44 mr-4"
+            onPress={async () => {
+              await playQueue(editorsPickSongs, index);
+              router.push("/playingScreen");
+            }}  
+          >
+            <Image source={{uri : item.thumbnail_url}} className="h-44 w-44 rounded-sm"/>
+            <Text 
+              className="text-text1 text-md font-poppins-semibold mt-2" 
+              numberOfLines={2} 
+              ellipsizeMode="tail"
+            >
+              {item.title}
+            </Text>
+            <Text className="text-text2 text-xs font-poppins-light">
+              {item.artists?.map((a) => a.name).join(", ")}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
       
       <View className="p-4 mt-6">
