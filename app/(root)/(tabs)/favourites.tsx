@@ -80,7 +80,7 @@ const PlaylistsRoute = () => {
         </View>
 
         <TouchableOpacity onPress={() => setShowModal(true)} className="flex flex-row mt-2 items-center">
-          <View className="bg-gray-900 h-14 w-14 items-center justify-center">
+          <View className="bg-[#ffffff30] h-14 w-14 items-center justify-center">
             <Image source={icons.add} tintColor={"white"} className="size-5" />
           </View>
           <Text className="text-text1 font-poppins-medium text-lg ml-4">Create Playlist</Text>

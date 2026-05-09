@@ -40,7 +40,12 @@ export default function Index() {
           );
 
           if (editorSongIds.length > 0) {
-            const editorSongs = await getSongsByIds(editorSongIds);
+            
+            const editorRes = await getSongsByIds(editorSongIds);
+
+            const editorSongs = Array.isArray(editorRes)
+              ? editorRes
+              : editorRes?.results || [];
 
             const songMap = new Map(
               editorSongs.map((song: Song) => [song.id, song])
@@ -54,7 +59,8 @@ export default function Index() {
           } else {
             setEditorsPickSongs([]);
           }
-
+          
+          await AsyncStorage.removeItem("HOME_CACHE");
           const cached = await AsyncStorage.getItem(CACHE_KEY);
 
           if (cached) {
@@ -95,15 +101,24 @@ export default function Index() {
           setRecentSongs(recentRes || []);
           setArtists(topArtists);
 
+          const imageResults = await Promise.all(
+            topArtists.map(async (artist) => {
+              const image = await getArtistImage(artist);
+
+              return {
+                artist,
+                image,
+              };
+            })
+          );
+
           const imagesMap: Record<string, string> = {};
 
-          for(const artist of topArtists) {
-            const image = await getArtistImage(artist);
-            
-            if(image) {
-              imagesMap[artist] = image;
-            }
-          }
+          imageResults.forEach(({ artist, image }) => {
+            imagesMap[artist] =
+              image ||
+              "https://global.honda/en/RandD/assets/img/member/member_ninomiya.jpg";
+          });
 
           setArtistImages(imagesMap);
 

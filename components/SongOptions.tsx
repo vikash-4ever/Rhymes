@@ -1,14 +1,15 @@
 import { getArtistImage } from "@/lib/api/musicApis";
 import {
-    addEditorsPick,
-    deleteEditorsPick,
-    getEditorsPick,
-    toggleLike,
-    toggleSongInPlaylist,
+  addEditorsPick,
+  deleteEditorsPick,
+  getEditorsPick,
+  toggleLike,
+  toggleSongInPlaylist,
 } from "@/lib/appwrite";
 
 import { ADMIN_ID } from "@/lib/config";
 import { useGlobalContext } from "@/lib/global-provider";
+import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
 
 import { router } from "expo-router";
@@ -37,7 +38,7 @@ export default function SongOptions({
     loadPlaylists,
   } = useGlobalContext();
 
-  //const { addToNextQueue } = usePlayer();
+  const {addToNextQueue} = usePlayer();
 
   const isAdmin = user?.$id === ADMIN_ID;
 
@@ -203,9 +204,7 @@ export default function SongOptions({
       <TouchableOpacity
         className="py-2"
         onPress={() => {
-
-        //   addToNextQueue(song);
-
+          addToNextQueue(song);
           onClose();
         }}
       >

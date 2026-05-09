@@ -7,6 +7,7 @@ export const config = {
   usersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID!,
   playlistsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_PLAYLISTS_COLLECTION_ID!,
   editorsPickCollectionId: process.env.EXPO_PUBLIC_APPWRITE_EDITORS_PICK_COLLECTION_ID!,
+  searchHistoryCollectionId: process.env.EXPO_PUBLIC_APPWRITE_SEARCH_HISTORY_COLLECTION_ID!,
   endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!,
   projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
 };
@@ -188,5 +189,135 @@ export const deleteEditorsPick = async (docId: string) => {
     );
   } catch (error) {
     console.log("Delete Editors Pick Error:", error);
+  }
+};
+
+const savingSearches = new Set<string>();
+
+export const saveSearchHistory = async (
+  userId: string,
+  songId: string
+) => {
+
+  const uniqueKey = `${userId}_${songId}`;
+
+  // prevent duplicate simultaneous calls
+  if (savingSearches.has(uniqueKey)) {
+    return;
+  }
+
+  savingSearches.add(uniqueKey);
+
+  try {
+
+    // remove old history
+    const existing = await databases.listDocuments(
+      config.databaseId,
+      config.searchHistoryCollectionId,
+      [
+        Query.equal("userId", userId),
+        Query.equal("songId", songId),
+      ]
+    );
+
+    if (existing.documents.length > 0) {
+
+      await Promise.all(
+        existing.documents.map((doc) =>
+          databases.deleteDocument(
+            config.databaseId,
+            config.searchHistoryCollectionId,
+            doc.$id
+          )
+        )
+      );
+    }
+
+    // create fresh latest history
+    await databases.createDocument(
+      config.databaseId,
+      config.searchHistoryCollectionId,
+      ID.unique(),
+      {
+        userId,
+        songId,
+      }
+    );
+
+  } catch (error) {
+
+    console.log(
+      "saveSearchHistory error",
+      error
+    );
+
+  } finally {
+
+    savingSearches.delete(uniqueKey);
+
+  }
+};
+
+export const getSearchHistory = async (
+  userId: string
+) => {
+  try {
+
+    const res = await databases.listDocuments(
+      config.databaseId,
+      config.searchHistoryCollectionId,
+      [
+        Query.equal("userId", userId),
+        Query.orderDesc("$createdAt"),
+        Query.limit(20),
+      ]
+    );
+
+    return res.documents;
+
+  } catch (error) {
+    console.log("getSearchHistory error", error);
+    return [];
+  }
+};
+
+export const deleteSearchHistory = async (
+  userId: string,
+  songId?: string
+) => {
+  try {
+
+    const queries: any[] = [
+      Query.equal("userId", userId),
+    ];
+
+    // delete only one song history
+    if (songId) {
+      queries.push(
+        Query.equal("songId", songId)
+      );
+    }
+
+    const res = await databases.listDocuments(
+      config.databaseId,
+      config.searchHistoryCollectionId,
+      queries
+    );
+
+    await Promise.all(
+      res.documents.map((doc) =>
+        databases.deleteDocument(
+          config.databaseId,
+          config.searchHistoryCollectionId,
+          doc.$id
+        )
+      )
+    );
+
+  } catch (error) {
+    console.log(
+      "deleteSearchHistory error",
+      error
+    );
   }
 };

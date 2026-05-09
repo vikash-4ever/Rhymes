@@ -17,6 +17,8 @@ type PlayerContextType = {
   playNext: () => Promise<void>;
   playPrevious: () => Promise<void>;
 
+  addToNextQueue: (song: Song) => void;
+
   togglePlayPause: () => Promise<void>;
   stopTrack: () => Promise<void>;
   resetPlayer: () => Promise<void>;
@@ -130,9 +132,9 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
   }, [audioSource]);
 
   const playNext = async () => {
-    if (queue.length === 0) return;
+    if (queue.length === 0 || !currentTrack) return;
 
-    if(repeatMode === "one"){
+    if (repeatMode === "one") {
       await player.seekTo(0);
       await player.play();
       return;
@@ -140,16 +142,23 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
 
     let nextIndex;
 
-    if(isShuffle) {
+    const currentTrackIndex = queue.findIndex(
+      (s) => s.id === currentTrack.id
+    );
+
+    if (isShuffle) {
       nextIndex = Math.floor(Math.random() * queue.length);
     } else {
-        nextIndex = currentIndex + 1;
-        if(nextIndex >= queue.length){
-          if(repeatMode === "all") nextIndex = 0;
-          else return;
-        }
+      nextIndex = currentTrackIndex + 1;
+
+      if (nextIndex >= queue.length) {
+        if (repeatMode === "all") nextIndex = 0;
+        else return;
+      }
     }
+
     const nextTrack = queue[nextIndex];
+
     setCurrentIndex(nextIndex);
     setCurrentTrack(nextTrack);
     setAudioSource(nextTrack.audio_url);
@@ -232,6 +241,38 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const addToNextQueue = (song: Song) => {
+
+    if (!currentTrack) {
+      playTrack(song);
+      return;
+    }
+
+    setQueue((prevQueue) => {
+
+      // remove old occurrence
+      const filteredQueue = prevQueue.filter(
+        (s) => s.id !== song.id
+      );
+
+      // find current track again after filtering
+      const currentTrackIndex = filteredQueue.findIndex(
+        (s) => s.id === currentTrack.id
+      );
+
+      const updatedQueue = [...filteredQueue];
+
+      // insert after current track
+      updatedQueue.splice(
+        currentTrackIndex + 1,
+        0,
+        song
+      );
+
+      return updatedQueue;
+    });
+  };
+
   return (
     <PlayerContext.Provider
       value={{
@@ -247,6 +288,8 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
 
         playNext,
         playPrevious,
+
+        addToNextQueue,
         
         togglePlayPause,
         stopTrack,

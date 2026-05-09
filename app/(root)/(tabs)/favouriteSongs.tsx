@@ -25,9 +25,35 @@ export default function FavouriteSongs(){
     const playlist = playlists.find(p => p.$id === id);
     const isLiked = selectedSong ? likedSongs.includes(selectedSong.id) : false;
     const [gradientColors, setGradientColors] = React.useState<readonly[string, string]>([
-        "#5753a0",
+        "#3f3a9b",
         "#000000"
     ]);
+    
+    const imageUri = React.useMemo(() => {
+        const rawImage = Array.isArray(image) ? image[0] : image;
+        if (rawImage && typeof rawImage === 'string') {
+            // Swap 1000x1000 for 500x500 to save 75% memory
+            return rawImage.replace("1000x1000", "256x256");
+        }
+        return null;
+    }, [image]);
+
+    const artistImage = React.useMemo(() => {
+        try {
+            // If artist is passed as a stringified object
+            if (typeof artist === 'string') {
+                const parsedArtist = JSON.parse(artist);
+                return parsedArtist.image || parsedArtist.picture || parsedArtist.cover;
+            }
+            return null;
+        } catch (e) {
+            return null;
+        }
+    }, [artist]);
+
+    // Final fallback logic
+    const finalImageUri = artistImage || imageUri;
+
 
     const extractColors = async (uri: string) => {
         try {
@@ -35,17 +61,17 @@ export default function FavouriteSongs(){
 
             console.log("Image uri : ", uri);
             const result = await ImageColors.getColors(uri, {
-                fallback: "#5753a0",
+                fallback: "#3f3a9b",
             });
 
             if (!result) return;
 
             if (result.platform === "android") {
-                setGradientColors([result.dominant || "#5753a0", result.average || "#000000"] as const);
+                setGradientColors([result.dominant || "#3f3a9b", result.average || "#000000"] as const);
             } else if(result.platform === "ios"){
-                setGradientColors([result.background || "#5753a0", result.primary || "#000000"] as const);
+                setGradientColors([result.background || "#3f3a9b", result.primary || "#000000"] as const);
             } else {
-                setGradientColors(["#5753a0", "#000000"] as const)
+                setGradientColors(["#3f3a9b", "#000000"] as const)
             }
         } catch (error) { 
             console.log("Color extract error : ", error);
@@ -94,15 +120,16 @@ export default function FavouriteSongs(){
             setGradientColors(["#3f3f46", "#000000"]);
             return;
         }
+
         setGradientColors(["#000000", "#000000"])
+
         if (type === "playlist" && playlist?.coverImage) {
             extractColors(playlist.coverImage);
+        } else if (type === "artist" && imageUri) {
+            extractColors(imageUri);
+            console.log("Rendering artist image:", imageUri);
         }
-
-        if (type === "artist" && typeof image === "string" && image.length > 0) {
-            extractColors(image);
-        }
-    },[playlist?.coverImage, type, image]);
+    },[playlist?.coverImage, type, imageUri]);
 
     useEffect(() => {
 
@@ -161,6 +188,7 @@ export default function FavouriteSongs(){
                     top: 18,
                     alignSelf: "center",
                     opacity: imageOpacity,
+                    zIndex: 100,
                 }}
             >
                 <View className="h-48 w-48 mt-12 items-center justify-center">
@@ -169,14 +197,20 @@ export default function FavouriteSongs(){
                             source={{uri: playlist.coverImage}}
                             className="h-full w-full rounded-sm"
                         />
-                    ) : type === "artist" &&
-                            typeof image === "string" &&
-                            image.length > 0 ? (
-                        <Image
-                            source={{ uri: image as string }}
-                            className="h-full w-full rounded-full"
-                            resizeMode="cover"
-                        />
+                    ) : type === "artist" && imageUri ? (
+                        <View 
+                            style={{ width: 168, height: 168, borderRadius: 96, overflow: 'hidden', backgroundColor: '#000000' }}
+                        >
+                            <Image
+                                key={finalImageUri} // Force re-render if URI changes
+                                source={{ uri: finalImageUri, width: 256, height: 256 }}
+                                style={{ width: 168, height: 168 }}
+                                resizeMode="cover"
+                                fadeDuration={300}
+                                onLoad={() => console.log("Success: Image visible")}
+                                onError={(e) => console.log("Error: Image failed", e.nativeEvent.error)}
+                            />
+                        </View>    
                     ) : type === "local" ? (
                         <>
                             <LinearGradient
@@ -246,7 +280,7 @@ export default function FavouriteSongs(){
             ) : (
                 <Animated.ScrollView 
                     className="w-full mt-1"
-                    style={{ transform: [{translateY: scrollTranslateY}]}}
+                    style={{ transform: [{translateY: scrollTranslateY}], zIndex: 1}}
                     contentContainerStyle={{ paddingTop: 325, paddingBottom: 660}}
                     showsVerticalScrollIndicator= {false}
                     onScroll={Animated.event(

@@ -1,5 +1,7 @@
 import icons from "@/constants/icons";
-import { searchSongs } from "@/lib/api/musicApis";
+import { getSongsByIds, searchSongs } from "@/lib/api/musicApis";
+import { deleteSearchHistory, getSearchHistory, saveSearchHistory } from "@/lib/appwrite";
+import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
 import { router } from "expo-router";
@@ -7,10 +9,14 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Image, Keyboard, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function SearchScreen() {
+
+    const {user} = useGlobalContext();
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState<Song[]>([]);
     const [debouncedQuery, setDebouncedQuery] = useState("");
+    const [recentSongs, setRecentSongs] = useState<Song[]>([]);
+    const [navigating, setNavigating] = useState(false);
     const {playQueue} = usePlayer();
 
     const cancelTokenRef = useRef<AbortController | null>(null);
@@ -36,6 +42,42 @@ export default function SearchScreen() {
             .sort((a, b) => b.score - a.score)
             .map((item) => item.song);
     };
+
+    useEffect(() => {
+
+  const loadHistory = async () => {
+
+        if (!user) return;
+
+        const historyDocs =
+        await getSearchHistory(user.$id);
+
+        const ids = historyDocs.map(
+        (doc: any) => doc.songId
+        );
+
+        if (ids.length === 0) {
+        setRecentSongs([]);
+        return;
+        }
+
+        const songs = await getSongsByIds(ids);
+
+        const songMap = new Map(
+        songs.map((song: Song) => [song.id, song])
+        );
+
+        const orderedSongs = ids
+        .map((id: string) => songMap.get(id))
+        .filter((song): song is Song => Boolean(song));
+
+        setRecentSongs(orderedSongs);
+
+    };
+
+    loadHistory();
+
+    }, [user]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -79,16 +121,99 @@ export default function SearchScreen() {
 
     }, [debouncedQuery]);
 
+    const handleSongPress = async (
+        item: Song,
+        queue: Song[],
+        index: number
+    ) => {
+
+        if (navigating) return;
+
+        try {
+
+            setNavigating(true);
+
+            Keyboard.dismiss();
+
+            // update local recent instantly
+            setRecentSongs((prev) => {
+
+                const filtered = prev.filter(
+                    (song) => song.id !== item.id
+                );
+
+                return [item, ...filtered];
+            });
+
+            // save in background
+            if (user) {
+                saveSearchHistory(
+                    user.$id,
+                    item.id
+                );
+            }
+
+            router.push({
+                pathname: "/searchResult",
+                params: {
+                    result: JSON.stringify(item),
+                    queue: JSON.stringify(queue),
+                    index,
+                },
+            });
+
+        } finally {
+
+            setTimeout(() => {
+                setNavigating(false);
+            }, 800);
+
+        }
+    };
+
+    const handleDeleteRecentSong = async (
+        songId: string
+    ) => {
+
+        if (!user) return;
+
+        // instant UI update
+        setRecentSongs((prev) =>
+            prev.filter(
+                (song) => song.id !== songId
+            )
+        );
+
+        // delete from appwrite
+        await deleteSearchHistory(
+            user.$id,
+            songId
+        );
+    };
+
+    const handleClearAllRecent = async () => {
+
+        if (!user) return;
+
+        // instant UI update
+        setRecentSongs([]);
+
+        // clear database
+        await deleteSearchHistory(
+            user.$id
+        );
+    };
+
     const handleSubmit = () => {
         Keyboard.dismiss();
     };
 
     return(
         <View className="flex h-full bg-primary-200">
-            <View className="flex flex-row w-full bg-primary-300 items-center justify-between px-5 gap-5">
+            <View className="flex flex-row w-full h-14 bg-primary-300 items-center justify-between px-5 gap-5">
                 <TouchableOpacity 
                     onPress={() => router.push('/(root)/(tabs)/search')} 
-                    className="items-center justify-center"
+                    className="items-center justify-center h-10 w-10"
                 >
                     <Image source={icons.back} tintColor={'white'} className="size-5 my-5"/>
                 </TouchableOpacity>
@@ -105,7 +230,8 @@ export default function SearchScreen() {
                     autoFocus
                 />
                 {query.trim() !== "" && (
-                    <TouchableOpacity 
+                    <TouchableOpacity
+                        className="items-center justify-center h-10 w-10"
                         onPress={() => {
                             setQuery(""); 
                             setResults([]);
@@ -118,13 +244,119 @@ export default function SearchScreen() {
 
             {loading ? (
                 <ActivityIndicator size="large" color="#fff" className="mt-20" />
+            ) : query.trim() === "" ?(
+                <View className="flex-1 px-3 pt-5">
+
+                    {recentSongs.length > 0 ? (
+                        <>
+                            <View className="flex-row items-center justify-center mb-4">
+                                <Text className="text-white text-xl font-poppins-semibold">
+                                    Recent Searches
+                                </Text>
+                            </View>
+                            <View className="flex-row items-center justify-between mb-4">
+                                <TouchableOpacity
+                                    onPress={handleClearAllRecent}
+                                    className="h-6 w-auto"
+                                >
+                                    <Text className="text-text2 font-poppins-medium text-sm">
+                                        Clear all
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <FlatList
+                                data={recentSongs}
+                                keyboardShouldPersistTaps="handled"
+                                keyExtractor={(item, index) =>
+                                    item.id || index.toString()
+                                }
+                                showsVerticalScrollIndicator={false}
+                                renderItem={({ item, index }) => (
+                                    <TouchableOpacity
+                                        className="w-full py-2"
+                                        onPress={() => {
+                                            handleSongPress(
+                                                item,
+                                                recentSongs,
+                                                index,
+                                            )
+                                       }}
+                                    >
+                                        <View className="flex-row items-center gap-3">
+                                            <Image
+                                                source={
+                                                    item.thumbnail_url
+                                                        ? { uri: item.thumbnail_url }
+                                                        : icons.disk
+                                                }
+                                                resizeMode="stretch"
+                                                className="h-12 w-12"
+                                            />
+
+                                            <View className="flex-1">
+                                                <Text
+                                                    className="text-white text-lg"
+                                                    numberOfLines={1}
+                                                >
+                                                    {item.title}
+                                                </Text>
+
+                                                <Text
+                                                    className="text-gray-500 text-sm"
+                                                    numberOfLines={1}
+                                                >
+                                                    {item.artists
+                                                        ?.map((a) => a.name)
+                                                        .join(", ") ||
+                                                        "Unknown Artist"}
+                                                </Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                onPress={() =>
+                                                    handleDeleteRecentSong(
+                                                        item.id
+                                                    )
+                                                }
+                                                className="p-3"
+                                                hitSlop={{
+                                                    top: 10,
+                                                    bottom: 10,
+                                                    left: 10,
+                                                    right: 10,
+                                                }}
+                                            >
+                                                <Image
+                                                    source={icons.cancel}
+                                                    tintColor={"#6B7280"}
+                                                    className="size-5"
+                                                />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        </>
+                    ) : (
+                        <View className="h-full items-center justify-center gap-2">
+                            <Text className="text-white text-lg font-poppins-medium">
+                                Find the music you love
+                            </Text>
+
+                            <Text className="text-sm text-gray-400 font-poppins-medium">
+                                From millions of artists, songs and playlists.
+                            </Text>
+                        </View>
+                    )}
+                </View>
             ) : results.length === 0 ? (
-                <View className="h-full mt-[80%] items-center gap-2">
+                <View className="h-full items-center justify-center gap-2">
                     <Text className="text-white text-lg font-poppins-medium">
-                        Find the music you love
+                        No results found
                     </Text>
+
                     <Text className="text-sm text-gray-400 font-poppins-medium">
-                        From millions of artists, songs and playlists.
+                        Try searching something else.
                     </Text>
                 </View>
             ) : (
@@ -133,18 +365,16 @@ export default function SearchScreen() {
                         data={results}
                         keyExtractor={(item, index) => item.id || index.toString()}
                         showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
                         renderItem={({ item, index }) => ( 
                             <TouchableOpacity
                                 className="w-full py-2 px-3"
                                 onPress={() => {
-                                    router.push({
-                                        pathname: "/searchResult",
-                                        params: {
-                                            result: JSON.stringify(item),
-                                            queue: JSON.stringify(results),
-                                            index: index
-                                        }
-                                    });
+                                    handleSongPress(
+                                        item,
+                                        results,
+                                        index,
+                                    )
                                 }}
                                 >
                                 <View className="flex-row items-center gap-3">
