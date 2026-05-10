@@ -44,58 +44,58 @@ export default function SettingsScreen() {
                 </View>
             </View>
             <TouchableOpacity className="flex w-full px-5 py-3">
-                <Text className="text-white text-lg font-poppins-regular">
+                <Text className="text-white text-lg font-poppins-medium">
                     Account
                 </Text>
-                <Text className="text-sm text-gray-400">
+                <Text className="text-sm font-poppins-light text-gray-400">
                     {appUser?.name || appUser?.email || "Guest"}
                 </Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex w-full px-5 py-3">
-                <Text className="text-white text-lg font-poppins-regular">
+                <Text className="text-white text-lg font-poppins-medium">
                     Mobile Data
                 </Text>
-                <Text className="text-sm text-gray-400">
+                <Text className="text-sm font-poppins-light text-gray-400">
                     4 MB used by Rhymes this month
                 </Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex w-full px-5 py-3">
-                <Text className="text-white text-lg font-poppins-regular">
+                <Text className="text-white text-lg font-poppins-medium">
                     Storage
                 </Text>
-                <Text className="text-sm text-gray-400">
+                <Text className="text-sm font-poppins-light text-gray-400">
                     57 MB used by Rhymes
                 </Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex w-full px-5 py-3">
-                <Text className="text-white text-lg font-poppins-regular">
+                <Text className="text-white text-lg font-poppins-medium">
                     Audio Settings
                 </Text>
-                <Text className="text-sm text-gray-400">
+                <Text className="text-sm font-poppins-light text-gray-400">
                     Audio Quality: Auto
                 </Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex w-full px-5 py-3">
-                <Text className="text-white text-lg font-poppins-regular">
+                <Text className="text-white text-lg font-poppins-medium">
                     Download Settings
                 </Text>
-                <Text className="text-sm text-gray-400">
+                <Text className="text-sm font-poppins-light text-gray-400">
                     Downloading on Wi-Fi only
                 </Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex w-full px-5 py-3">
-                <Text className="text-white text-lg font-poppins-regular">
+                <Text className="text-white text-lg font-poppins-medium">
                     Privacy Settings
                 </Text>
-                <Text className="text-sm text-gray-400">
+                <Text className="text-sm font-poppins-light text-gray-400">
                     Manage sharing your listening activity
                 </Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex w-full px-5 py-3">
-                <Text className="text-white text-lg font-poppins-regular">
+                <Text className="text-white text-lg font-poppins-medium">
                     About
                 </Text>
-                <Text className="text-sm text-gray-400 font-poppins-regular">
+                <Text className="text-sm font-poppins-light text-gray-400">
                     Rhymes v1.0.0
                 </Text>
             </TouchableOpacity>

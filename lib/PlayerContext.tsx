@@ -46,7 +46,7 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
     setAudioModeAsync({
       playsInSilentMode: true,
       shouldPlayInBackground:true,
-      interruptionMode: "duckOthers",
+      interruptionMode: "doNotMix",
     });
   }, []);
 

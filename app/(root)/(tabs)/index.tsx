@@ -17,7 +17,7 @@ export default function Index() {
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
   const [recentSongs, setRecentSongs] = useState<Song[]>([]);
   const [artists, setArtists] = useState<string[]>([]);
-  const [loadingHome, setLoadingHome] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const {playQueue} = usePlayer();
   const [artistImages, setArtistImages] = useState<Record<string, string>>({});
   const [editorsPickSongs, setEditorsPickSongs] = useState<Song[]>([]);
@@ -39,15 +39,6 @@ export default function Index() {
     let mounted = true;
       const loadHomeData = async () => {
         try {
-          const hasExistingData =
-            trendingSongs.length > 0 ||
-            recentSongs.length > 0 ||
-            artists.length > 0;
-
-          if (!hasExistingData) {
-            setLoadingHome(true);
-          }
-
           const cached = await AsyncStorage.getItem(CACHE_KEY);
           
           if (cached) {
@@ -60,7 +51,8 @@ export default function Index() {
               setArtists(parsed.artists || []);
               setArtistImages(parsed.artistImages || {});
               setEditorsPickSongs(parsed.editorsPickSongs || []);
-              setLoadingHome(false);
+
+              setInitialLoading(false);
 
               return;
             }
@@ -93,8 +85,6 @@ export default function Index() {
             orderedEditorSongs = editorSongIds
               .map((id: string) => songMap.get(id))
               .filter((s): s is Song => Boolean(s));
-
-            setEditorsPickSongs(orderedEditorSongs);
           }
         
           const artistCount: Record<string, number> = {};
@@ -117,6 +107,8 @@ export default function Index() {
             setArtists(topArtists);
             setEditorsPickSongs(orderedEditorSongs);
           }
+
+          setInitialLoading(false);
 
           const imageResults = await Promise.all(
             topArtists.map(async (artist) => {
@@ -143,7 +135,7 @@ export default function Index() {
 
           if(mounted) setArtistImages(imagesMap);
 
-          await AsyncStorage.setItem(
+          AsyncStorage.setItem(
             CACHE_KEY,
             JSON.stringify({
               time: Date.now(),
@@ -160,7 +152,7 @@ export default function Index() {
         } catch (error) {
           console.log("Home load error", JSON.stringify(error, null, 2));
         } finally {
-          setLoadingHome(false);
+          setInitialLoading(false);
         }
       };
       
@@ -170,17 +162,11 @@ export default function Index() {
       };
     }, []);
 
-    if (
-      loadingHome &&
-      trendingSongs.length === 0 &&
-      recentSongs.length === 0
-    ) {
+    if (initialLoading ) {
       return <HomeSkeleton />;
     }
 
-  return loadingHome && trendingSongs.length === 0 ? (
-      <HomeSkeleton/>
-    ) : (
+  return (
         <ScrollView className="flex flex-1 h-full bg-primary-200" showsVerticalScrollIndicator={false}>
           <View className="flex-1 flex-row justify-between items-center pl-4 ">
             <Text className="text-2xl font-poppins-semibold text-text1">

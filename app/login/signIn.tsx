@@ -93,7 +93,6 @@ export default function SignIN() {
         await AsyncStorage.removeItem("guestMode");
 
         await refreshUser();
-        router.replace("/(root)/(tabs)"); // Use replace to prevent going back
     } catch (err) {
       console.error("❌ Google login error:", err);
     }

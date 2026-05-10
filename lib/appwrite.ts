@@ -2,7 +2,7 @@ import { Account, Client, Databases, ID, Query } from "react-native-appwrite";
 
 
 export const config = {
-  platform: 'com.vishw.rhymes',
+  platform: 'com.vikash_4ever.Rhymes',
   databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
   usersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID!,
   playlistsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_PLAYLISTS_COLLECTION_ID!,
