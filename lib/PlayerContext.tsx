@@ -10,6 +10,7 @@ type PlayerContextType = {
   isShuffle: boolean;
   repeatMode: "off" | "one" | "all";
   player: any;
+  pendingQueue: Song[];
 
   playTrack: (track: Song) => Promise<void>;
   playQueue: (songs: Song[], startIndex: number) => Promise<void>;
@@ -18,6 +19,7 @@ type PlayerContextType = {
   playPrevious: () => Promise<void>;
 
   addToNextQueue: (song: Song) => void;
+  setPendingQueue: React.Dispatch<React.SetStateAction<Song[]>>;
 
   togglePlayPause: () => Promise<void>;
   stopTrack: () => Promise<void>;
@@ -64,6 +66,8 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
 
   const [queue, setQueue] = useState<Song[]>([]);
 
+  const [pendingQueue, setPendingQueue] = useState<Song[]>([]);
+
   const [currentIndex, setCurrentIndex] = useState<number>(0);
 
   const { recentlyPlayed, setRecentlyPlayed } = useGlobalContext();
@@ -107,7 +111,14 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
 
   const playQueue = async (songs: Song[], startIndex: number) => {
     try{
-      const track = songs[startIndex];
+      const track = songs?.[startIndex];
+      if(!track) {
+        console.warn("playqueue : invalid track/index",{
+          startIndex,
+          songsLength: songs?.length,
+        })
+        return;
+      }
       setQueue(songs);
       setCurrentIndex(startIndex);
       setCurrentTrack(track);
@@ -159,6 +170,7 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     const nextTrack = queue[nextIndex];
+    if (!nextIndex) return;
 
     setCurrentIndex(nextIndex);
     setCurrentTrack(nextTrack);
@@ -170,6 +182,8 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
     setCurrentIndex(prev => {
       const prevIndex = prev === 0 ? queue.length - 1 : prev - 1;
       const prevTrack = queue[prevIndex];
+      if (!prevTrack) return prev;
+
       setCurrentTrack(prevTrack);
       setAudioSource(prevTrack.audio_url);
       return prevIndex;
@@ -210,6 +224,7 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
   try {
     const shuffled = shuffleArray(songs);
 
+    if (!shuffled[0]) return;
     setQueue(shuffled);
     setCurrentIndex(0);
     setCurrentTrack(shuffled[0]);
@@ -289,7 +304,7 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
 
         playNext,
         playPrevious,
-
+        pendingQueue,
         addToNextQueue,
         
         togglePlayPause,
@@ -299,7 +314,8 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
         playShuffledQueue,
 
         setIsShuffle,
-        setRepeatMode
+        setRepeatMode,
+        setPendingQueue,
       }}
     >
       {children}

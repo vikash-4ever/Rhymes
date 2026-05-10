@@ -17,7 +17,7 @@ export default function SearchScreen() {
     const [debouncedQuery, setDebouncedQuery] = useState("");
     const [recentSongs, setRecentSongs] = useState<Song[]>([]);
     const [navigating, setNavigating] = useState(false);
-    const {playQueue} = usePlayer();
+    const {playQueue, setPendingQueue} = usePlayer();
 
     const cancelTokenRef = useRef<AbortController | null>(null);
 
@@ -47,7 +47,10 @@ export default function SearchScreen() {
 
   const loadHistory = async () => {
 
-        if (!user) return;
+        if (!user || user.$id === "guest") {
+            setRecentSongs([]);
+            return;
+        }; 
 
         const historyDocs =
         await getSearchHistory(user.$id);
@@ -146,18 +149,19 @@ export default function SearchScreen() {
             });
 
             // save in background
-            if (user) {
+            if (user && user.$id !== "guest") {
                 saveSearchHistory(
                     user.$id,
                     item.id
                 );
             }
 
+            setPendingQueue(queue);
+
             router.push({
                 pathname: "/searchResult",
                 params: {
                     result: JSON.stringify(item),
-                    queue: JSON.stringify(queue),
                     index,
                 },
             });
@@ -175,7 +179,7 @@ export default function SearchScreen() {
         songId: string
     ) => {
 
-        if (!user) return;
+        if (!user || user.$id === "guest") return;
 
         // instant UI update
         setRecentSongs((prev) =>
@@ -193,7 +197,7 @@ export default function SearchScreen() {
 
     const handleClearAllRecent = async () => {
 
-        if (!user) return;
+        if (!user || user.$id === "guest") return;
 
         // instant UI update
         setRecentSongs([]);
@@ -205,7 +209,9 @@ export default function SearchScreen() {
     };
 
     const handleSubmit = () => {
-        Keyboard.dismiss();
+        requestAnimationFrame(() => {
+            Keyboard.dismiss();
+        });
     };
 
     return(

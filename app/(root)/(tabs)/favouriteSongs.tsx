@@ -333,8 +333,9 @@ export default function FavouriteSongs(){
                         if(songs.length === 0) return;
                         await playShuffledQueue(songs);
                     }}
-                    className="self-center rounded-full bg-black items-center justify-center mt-8 z-10">
-                    <Text className="text-white text-lg font-poppins-semibold py-4 px-8">Shuffle play</Text>
+                    style={{backgroundColor: gradientColors[0]}}
+                    className="self-center rounded-full items-center justify-center mt-8 z-10">
+                    <Text className="text-[#00000080] text-lg font-poppins-semibold py-4 px-8">Shuffle play</Text>
                 </TouchableOpacity>
             </Animated.View>
             

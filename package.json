@@ -2,11 +2,6 @@
   "name": "rhymes",
   "main": "expo-router/entry",
   "version": "1.0.0",
-  "overrides": {
-    "react-native-appwrite": {
-      "expo-file-system": "19.0.21"
-    }
-  },
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -51,7 +46,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-appwrite": "^0.14.0",
+    "react-native-appwrite": "^0.29.0",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-get-random-values": "^1.11.0",
     "react-native-image-colors": "^2.5.0",

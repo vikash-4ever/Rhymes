@@ -72,9 +72,9 @@ export default function Index() {
             getEditorsPick(),
           ]);
           
-          const editorSongIds = editorsPickDocs.map(
-            (doc: any) => doc.songId
-          );
+          const editorSongIds = Array.isArray(editorsPickDocs)
+            ? editorsPickDocs.map((doc: any) => doc.songId)
+            : [];
 
           let orderedEditorSongs: Song[] = [];
 
@@ -154,9 +154,11 @@ export default function Index() {
               editorsPickSongs: orderedEditorSongs,
             })
           );
+          console.log("Editors docs:", editorsPickDocs);
+          console.log("Recent songs:", recentRes);
 
         } catch (error) {
-          console.log("Home load error", error);
+          console.log("Home load error", JSON.stringify(error, null, 2));
         } finally {
           setLoadingHome(false);
         }
@@ -201,7 +203,7 @@ export default function Index() {
                 </TouchableOpacity>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4 ml-4">
-                  {recentlyPlayed.map((item, index) => (
+                  {recentlyPlayed.filter(Boolean).map((item, index) => (
                     <TouchableOpacity
                       key={index}
                       className="mr-4"
@@ -317,13 +319,14 @@ export default function Index() {
                 <Image 
                   source={
                     failedImages[artist]
-                      ? images.image2
+                      ? images.artist
                       : artistImages[artist]
                       ? { uri: artistImages[artist],
                           cache: "force-cache"
                        }
-                      : images.image2
+                      : images.artist
                   }
+                  style={{tintColor:(failedImages[artist] || !artistImages[artist]) ? "#ffffff" : undefined}}
                   onError={() => {
                     console.log("Image Failed.", artist);
                     setFailedImages(prev => ({
