@@ -42,8 +42,9 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
   }, [user])
   useEffect(() => {
     setAudioModeAsync({
-      interruptionMode: "duckOthers",
       playsInSilentMode: true,
+      shouldPlayInBackground:true,
+      interruptionMode: "duckOthers",
     });
   }, []);
 
@@ -118,18 +119,18 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   useEffect(() => {
-
+  const startPlayback = async () => {
     if (!audioSource) return;
 
-    const start = async () => {
-      try {
-        await player.play();
-      } catch {}
-    };
+    try {
+      await player.play();
+    } catch (error) {
+      console.log("Playback error:", error);
+    }
+  };
 
-    start();
-
-  }, [audioSource]);
+  startPlayback();
+}, [audioSource, player]);
 
   const playNext = async () => {
     if (queue.length === 0 || !currentTrack) return;

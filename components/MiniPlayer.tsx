@@ -95,10 +95,10 @@ export default function MiniPlayer() {
         />
       </View>
 
-      <View className="flex-1 flex-row w-full items-center justify-between">
+      <View className="flex-1 flex-row h-14 w-full items-center justify-between">
         {/* Like */}
         <TouchableOpacity 
-          className="h-full items-center justify-center"
+          className="h-14 items-center justify-center"
           onPress={handleLikePress}
         >
           <Image

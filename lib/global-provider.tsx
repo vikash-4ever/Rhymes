@@ -166,7 +166,10 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
       }
       setLikesLoading(true);
       try{
-        if(!user?.$id) return;
+        if(!user?.$id || user.isGuest ) {
+          setLikedSongs([]);
+          return;
+        }
         const data = await getLikedSongs(user.$id);
         setLikedSongs(data || []);
       } catch(error) {
@@ -197,7 +200,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const handleToggleLike = async (songId: string) => {
-    if(!user?.$id) return;
+    if(!user?.$id || user.isGuest) return;
     const updated = await toggleLike(user.$id, songId);
     setLikedSongs(updated);
   };

@@ -1,39 +1,46 @@
 import SongItem from "@/components/SongItem";
 import SongOptions from "@/components/SongOptions";
 import icons from "@/constants/icons";
+import images from "@/constants/images";
 import { getSongsByArtist, getSongsByIds } from "@/lib/api/musicApis";
 import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Animated, Image, Modal, Text, TouchableOpacity, View } from "react-native";
 import ImageColors from "react-native-image-colors";
 
 export default function FavouriteSongs(){
 
-    const {playQueue, playShuffledQueue} = usePlayer();
+    const {playShuffledQueue} = usePlayer();
     const {type, id, title, artist, image} = useLocalSearchParams();
-    const {user, likedSongs, setLikedSongs, playlists, loadPlaylists} = useGlobalContext();
+    const {user, likedSongs, playlists} = useGlobalContext();
     const [songs, setSongs] = useState<Song[]>([]);
     const [songsLoading, setSongsLoading] = useState(false);
     const [songOptionsModal, setSongOptionsModal] = useState(false);
     const [selectedSong, setSelectedSong] = useState<Song | null>(null);
-    const prevIdsRef = useRef<string[]>([]);
     const scrollY = useState(new Animated.Value(0))[0];
-    const playlist = playlists.find(p => p.$id === id);
-    const isLiked = selectedSong ? likedSongs.includes(selectedSong.id) : false;
+    const playlist = React.useMemo(() => playlists.find(p => p.$id === id), [playlists, id]);
     const [gradientColors, setGradientColors] = React.useState<readonly[string, string]>([
         "#3f3a9b",
         "#000000"
     ]);
+
+    const optimizeImage = (url: string) => {
+        return url.replace(
+            /\d+x\d+/,
+            "256x256"
+        );
+    };
     
     const imageUri = React.useMemo(() => {
         const rawImage = Array.isArray(image) ? image[0] : image;
         if (rawImage && typeof rawImage === 'string') {
             // Swap 1000x1000 for 500x500 to save 75% memory
-            return rawImage.replace("1000x1000", "256x256");
+            return optimizeImage(rawImage) ;
         }
         return null;
     }, [image]);
@@ -55,7 +62,7 @@ export default function FavouriteSongs(){
     const finalImageUri = artistImage || imageUri;
 
 
-    const extractColors = async (uri: string) => {
+    const extractColors = React.useCallback( async (uri: string) => {
         try {
             if (!uri) return;
 
@@ -76,21 +83,19 @@ export default function FavouriteSongs(){
         } catch (error) { 
             console.log("Color extract error : ", error);
         }
-    }
+    }, []);
 
-    let sourceIds: string[] = [];
-    let isArtist = false;
+    const sourceIds = React.useMemo(() => {
+        if (type === "liked") {
+            return likedSongs;
+        }
 
-    if (type === "liked") {
-        sourceIds = likedSongs;
-    }
-    else if (type === "playlist") {
-        const playlist = playlists.find(p => p.$id === id);
-        sourceIds = playlist?.songIds || [];
-    }
-    else if (type === "artist") {
-        isArtist = true;
-    }
+        if (type === "playlist") {
+            return playlist?.songIds || [];
+        }
+
+        return [];
+    }, [type, likedSongs, playlist]);
 
     const textTranslateY = scrollY.interpolate({
         inputRange: [0, 200],
@@ -133,10 +138,42 @@ export default function FavouriteSongs(){
 
     useEffect(() => {
 
+        let mounted = true;
+
         const loadSongs = async () => {
             setSongsLoading(true);
+            const cacheKey =
+                type === "artist"
+                    ? `ARTIST_${artist}`
+                    : type === "liked"
+                    ? `LIKED_${user?.$id}`
+                    : `PLAYLIST_${id}`;
 
             try {
+
+                if (type === "playlist") {
+                    const currentIds = JSON.stringify(sourceIds);
+
+                    const savedIds = await AsyncStorage.getItem(
+                        `${cacheKey}_IDS`
+                    );
+
+                    if (savedIds !== currentIds) {
+                        await AsyncStorage.multiRemove([
+                            cacheKey,
+                            `${cacheKey}_IDS`
+                        ]);
+                    }
+                }
+                
+                const cached = await AsyncStorage.getItem(cacheKey);
+
+                if (cached) {
+                    if (mounted) setSongs(JSON.parse(cached));
+                    setSongsLoading(false);
+
+                    return;
+                }
                 if( type === "artist") {
                     const res = await getSongsByArtist(artist as string);
 
@@ -144,12 +181,16 @@ export default function FavouriteSongs(){
                         ? res
                         : res?.results || [];
 
-                    setSongs(artistSongs);
+                    if (mounted) setSongs(artistSongs);
+                    await AsyncStorage.setItem(
+                        cacheKey,
+                        JSON.stringify(artistSongs)
+                    );
                     return;
                 }
 
                 if (!sourceIds || sourceIds.length === 0) {
-                    setSongs([]);
+                    if (mounted) setSongs([]);
                     return;
                 }
 
@@ -159,7 +200,12 @@ export default function FavouriteSongs(){
 
                 const songMap = new Map(res.map((s: Song) => [s.id, s]));
                 const orderedSongs = sourceIds.map(id => songMap.get(id)).filter((s) : s is Song => Boolean(s));
-                setSongs(orderedSongs);
+                if (mounted) setSongs(orderedSongs);
+
+                await AsyncStorage.multiSet([
+                    [cacheKey, JSON.stringify(orderedSongs)],
+                    [`${cacheKey}_IDS`, JSON.stringify(sourceIds)],
+                ]);
             } catch (error) {
                 console.log("Liked fetch error : ", error);
             } finally {
@@ -167,8 +213,25 @@ export default function FavouriteSongs(){
             }
         };
         loadSongs();
-    }, [type, id, artist, playlists, likedSongs]);
+        return () => {
+            mounted = false;
+        };
+    }, [type, id, artist, sourceIds]);
 
+    const renderedSongs = React.useMemo(() => {
+        return songs.map((song, index) => (
+            <SongItem
+                key={song.id ?? index}
+                song={song}
+                index={index}
+                songs={songs}
+                onOptionsPress={() => {
+                    setSelectedSong(song);
+                    setSongOptionsModal(true);
+                }}
+            />
+        ));
+    }, [songs]);
 
     return(
         <View className="flex-1 bg-black">
@@ -197,16 +260,24 @@ export default function FavouriteSongs(){
                             source={{uri: playlist.coverImage}}
                             className="h-full w-full rounded-sm"
                         />
-                    ) : type === "artist" && imageUri ? (
+                    ) : type === "artist" ? (
                         <View 
                             style={{ width: 168, height: 168, borderRadius: 96, overflow: 'hidden', backgroundColor: '#000000' }}
                         >
                             <Image
                                 key={finalImageUri} // Force re-render if URI changes
-                                source={{ uri: finalImageUri, width: 256, height: 256 }}
+                                source={finalImageUri
+                                    ? {
+                                        uri: finalImageUri,
+                                        cache: "force-cache",
+                                    }
+                                    : images.image2
+                                }
                                 style={{ width: 168, height: 168 }}
                                 resizeMode="cover"
+                                resizeMethod="resize"
                                 fadeDuration={300}
+                                progressiveRenderingEnabled
                                 onLoad={() => console.log("Success: Image visible")}
                                 onError={(e) => console.log("Error: Image failed", e.nativeEvent.error)}
                             />
@@ -289,20 +360,7 @@ export default function FavouriteSongs(){
                     )}
                     scrollEventThrottle={16}
                 >   
-                    {
-                        songs.map((song, index) => (
-                            <SongItem
-                                key={song.id ?? index}
-                                song={song}
-                                index={index}
-                                songs={songs}
-                                onOptionsPress={() => {
-                                    setSelectedSong(song);
-                                    setSongOptionsModal(true);
-                                }}
-                            />    
-                        ))
-                    }
+                    {renderedSongs}
                 </Animated.ScrollView>
             )}
 

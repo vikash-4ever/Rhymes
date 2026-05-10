@@ -1,6 +1,7 @@
 import icons from "@/constants/icons";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
+import React from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 
 type Props = {
@@ -10,7 +11,7 @@ type Props = {
   onOptionsPress?: () => void;
 };
 
-export default function SongItem({song, index, songs, onOptionsPress} : Props) {
+export function SongItem({song, index, songs, onOptionsPress} : Props) {
     const { playQueue, currentTrack } = usePlayer();
 
     const isPlaying = currentTrack?.id === song.id;
@@ -40,10 +41,12 @@ export default function SongItem({song, index, songs, onOptionsPress} : Props) {
           </View>
         <TouchableOpacity
           onPress={onOptionsPress}
-          className="absolute right-0 h-16 w-14 items-center justify-center"
+          className="absolute right-0 h-14 w-14 items-center justify-center"
         >
         <Image source={icons.option} className="size-5" tintColor="gray" />
       </TouchableOpacity>
     </TouchableOpacity>
     )
 }
+
+export default React.memo(SongItem);

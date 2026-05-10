@@ -140,27 +140,27 @@ export default function SignIN() {
           ))}
         </View>
 
-        <View className="mt-[55%] px-8">
+        <View className="items-center mt-[55%] px-8">
           <TouchableOpacity 
             onPress={loginAsGuest}
-            className="items-center justify-center mb-10"
+            className="h-10 px-2 w-auto items-center justify-center mb-8"
           >
             <Text className="font-poppins-medium text-white">Wanna try it? 🎧</Text>
           </TouchableOpacity>
  
           <TouchableOpacity
             onPress={handleGoogleLogin}
-            className="flex-row border border-white rounded-full py-3 px-8 justify-between items-center"
+            className="flex-row border border-white rounded-full gap-5 py-3 px-8 justify-between items-center"
           >
             <Image source={icons.google} tintColor={"white"} className="size-5" />
-            <Text className="text-white text-lg font-poppins-semibold mr-8">
+            <Text className="text-white text-lg font-poppins-semibold ">
               Continue with Google
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => router.push("/login/loginOptions")}
-            className="items-center justify-center mt-8"
+            className="h-10 px-2 items-center justify-center mt-5"
           >
             <Text className="text-lg text-white font-poppins-semibold">Log in</Text>
           </TouchableOpacity>

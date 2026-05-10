@@ -210,10 +210,10 @@ export default function SearchScreen() {
 
     return(
         <View className="flex h-full bg-primary-200">
-            <View className="flex flex-row w-full h-14 bg-primary-300 items-center justify-between px-5 gap-5">
+            <View className="flex flex-row w-full h-14 bg-primary-300 items-center justify-between pr-2 gap-5">
                 <TouchableOpacity 
                     onPress={() => router.push('/(root)/(tabs)/search')} 
-                    className="items-center justify-center h-10 w-10"
+                    className="items-center justify-center h-full w-14"
                 >
                     <Image source={icons.back} tintColor={'white'} className="size-5 my-5"/>
                 </TouchableOpacity>
@@ -231,7 +231,7 @@ export default function SearchScreen() {
                 />
                 {query.trim() !== "" && (
                     <TouchableOpacity
-                        className="items-center justify-center h-10 w-10"
+                        className="items-center justify-center h-full w-14"
                         onPress={() => {
                             setQuery(""); 
                             setResults([]);
@@ -254,12 +254,12 @@ export default function SearchScreen() {
                                     Recent Searches
                                 </Text>
                             </View>
-                            <View className="flex-row items-center justify-between mb-4">
+                            <View className="flex-row items-center justify-end mb-4">
                                 <TouchableOpacity
                                     onPress={handleClearAllRecent}
-                                    className="h-6 w-auto"
+                                    className="h-8 w-auto justify-center"
                                 >
-                                    <Text className="text-text2 font-poppins-medium text-sm">
+                                    <Text className="text-text2 font-poppins-medium text-sm mx-2">
                                         Clear all
                                     </Text>
                                 </TouchableOpacity>
