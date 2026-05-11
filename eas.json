@@ -17,7 +17,11 @@
         "EXPO_PUBLIC_APPWRITE_DATABASE_ID": "68dd57910005aafbf909",
         "EXPO_PUBLIC_APPWRITE_USERS_COLLECTION_ID": "users",
         "EXPO_PUBLIC_APPWRITE_PLAYLISTS_COLLECTION_ID": "playlists",
-        "EXPO_PUBLIC_API_URL": "https://rhymes-backend.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://rhymes-backend.onrender.com",
+        "EXPO_PUBLIC_APPWRITE_EDITORS_PICK_COLLECTION_ID": "editors_pick",
+        "EXPO_PUBLIC_APPWRITE_SEARCH_HISTORY_COLLECTION_ID": "search_history",
+        "EXPO_PUBLIC_APPWRITE_PACKAGE_NAME": "com.vikash_4ever.Rhymes",
+        "EXPO_PUBLIC_LASTFM_API_KEY": "d064118daa64e0564f992e1a76722103"
       }
     },
     "production": {

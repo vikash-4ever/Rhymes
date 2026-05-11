@@ -1,7 +1,7 @@
 import HomeSkeleton from "@/components/HomeSkeleton";
 import icons from "@/constants/icons";
 import images from "@/constants/images";
-import { getArtistImage, getRecentSongs, getSongsByIds, getTrendingSongs } from "@/lib/api/musicApis";
+import { getRecentSongs, getSongsByIds, getTrendingSongs } from "@/lib/api/musicApis";
 import { getEditorsPick } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
@@ -11,15 +11,13 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
-
 export default function Index() {
-  const {recentlyPlayed} = useGlobalContext();
+  const {recentlyPlayed, artistImages, loadArtistImage, setArtistImages} = useGlobalContext();
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
   const [recentSongs, setRecentSongs] = useState<Song[]>([]);
   const [artists, setArtists] = useState<string[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const {playQueue} = usePlayer();
-  const [artistImages, setArtistImages] = useState<Record<string, string>>({});
   const [editorsPickSongs, setEditorsPickSongs] = useState<Song[]>([]);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
@@ -27,13 +25,6 @@ export default function Index() {
   const CACHE_KEY = "HOME_CACHE";
   const CACHE_TTL = 1000 * 60 * 60 * 12;
   //--------------------------------------
-
-  const optimizeImage = (url: string) => {
-    return url.replace(
-      /\d+x\d+/,
-      "256x256"
-    );
-  };
 
   React.useEffect(() => {
     let mounted = true;
@@ -49,9 +40,8 @@ export default function Index() {
               setTrendingSongs(parsed.trending || []);
               setRecentSongs(parsed.recent || []);
               setArtists(parsed.artists || []);
-              setArtistImages(parsed.artistImages || {});
               setEditorsPickSongs(parsed.editorsPickSongs || []);
-
+              setArtistImages(parsed.artistImages || []);
               setInitialLoading(false);
 
               return;
@@ -110,30 +100,17 @@ export default function Index() {
 
           setInitialLoading(false);
 
-          const imageResults = await Promise.all(
+          const imageEntries = await Promise.all(
             topArtists.map(async (artist) => {
-              try {
-                const image = await getArtistImage(artist);
-  
-                return {
-                  artist,
-                  image,
-                };
-              } catch {
-                return {artist, image: ""} 
-              };
+              const image = await loadArtistImage(artist);
+
+              return [artist, image];
             })
           );
 
-          const imagesMap: Record<string, string> = {};
-
-          imageResults.forEach(({ artist, image }) => {
-            if (image) {
-              imagesMap[artist] = optimizeImage(image);
-            }
-          });
-
-          if(mounted) setArtistImages(imagesMap);
+          const imagesMap = Object.fromEntries(
+            imageEntries.filter(([_, image]) => image)
+          );
 
           AsyncStorage.setItem(
             CACHE_KEY,
@@ -146,8 +123,6 @@ export default function Index() {
               editorsPickSongs: orderedEditorSongs,
             })
           );
-          console.log("Editors docs:", editorsPickDocs);
-          console.log("Recent songs:", recentRes);
 
         } catch (error) {
           console.log("Home load error", JSON.stringify(error, null, 2));
@@ -314,7 +289,6 @@ export default function Index() {
                   }
                   style={{tintColor:(failedImages[artist] || !artistImages[artist]) ? "#ffffff" : undefined}}
                   onError={() => {
-                    console.log("Image Failed.", artist);
                     setFailedImages(prev => ({
                       ...prev,
                       [artist]: true,

@@ -17,7 +17,7 @@ export default function FavouriteSongs(){
 
     const {playShuffledQueue} = usePlayer();
     const {type, id, title, artist, image} = useLocalSearchParams();
-    const {user, likedSongs, playlists} = useGlobalContext();
+    const {user, likedSongs, playlists, likedArtists, handleToggleArtist} = useGlobalContext();
     const [songs, setSongs] = useState<Song[]>([]);
     const [songsLoading, setSongsLoading] = useState(false);
     const [songOptionsModal, setSongOptionsModal] = useState(false);
@@ -45,28 +45,14 @@ export default function FavouriteSongs(){
         return null;
     }, [image]);
 
-    const artistImage = React.useMemo(() => {
-        try {
-            // If artist is passed as a stringified object
-            if (typeof artist === 'string') {
-                const parsedArtist = JSON.parse(artist);
-                return parsedArtist.image || parsedArtist.picture || parsedArtist.cover;
-            }
-            return null;
-        } catch (e) {
-            return null;
-        }
-    }, [artist]);
+    const isArtistLiked = type === "artist" && likedArtists.includes(artist as string);
 
-    // Final fallback logic
-    const finalImageUri = artistImage || imageUri;
-
+    const finalImageUri = imageUri;
 
     const extractColors = React.useCallback( async (uri: string) => {
         try {
             if (!uri) return;
 
-            console.log("Image uri : ", uri);
             const result = await ImageColors.getColors(uri, {
                 fallback: "#3f3a9b",
             });
@@ -132,7 +118,6 @@ export default function FavouriteSongs(){
             extractColors(playlist.coverImage);
         } else if (type === "artist" && imageUri) {
             extractColors(imageUri);
-            console.log("Rendering artist image:", imageUri);
         }
     },[playlist?.coverImage, type, imageUri]);
 
@@ -241,9 +226,28 @@ export default function FavouriteSongs(){
                 end={{ x: 0.1, y: 0.7 }}
                 className="absolute inset-0"
             />
-            <TouchableOpacity onPress={router.back} className="absolute z-10 top-0 left-0 h-14 w-14 items-center justify-center">
+            <TouchableOpacity onPress={router.back} className="absolute z-10 top-0 left-0 h-14 w-16 items-center justify-center">
                 <Image source={icons.back} className="size-6" tintColor={"white"}/>
             </TouchableOpacity>
+
+            {type === "artist" && (
+                <TouchableOpacity
+                    onPress={() =>
+                        handleToggleArtist(artist as string)
+                    }
+                    className="absolute z-10 top-0 right-0 h-14 w-16 items-center justify-center"
+                >
+                    <Image
+                        source={
+                            isArtistLiked
+                                ? icons.starFilled
+                                : icons.star
+                        }
+                        tintColor="white"
+                        className="size-6"
+                    />
+                </TouchableOpacity>
+            )}
 
             <Animated.View
                 style={{
@@ -271,15 +275,14 @@ export default function FavouriteSongs(){
                                         uri: finalImageUri,
                                         cache: "force-cache",
                                     }
-                                    : images.image2
+                                    : images.artist
                                 }
+                                tintColor={!finalImageUri ? "white" : undefined}
                                 style={{ width: 168, height: 168 }}
                                 resizeMode="cover"
                                 resizeMethod="resize"
                                 fadeDuration={300}
                                 progressiveRenderingEnabled
-                                onLoad={() => console.log("Success: Image visible")}
-                                onError={(e) => console.log("Error: Image failed", e.nativeEvent.error)}
                             />
                         </View>    
                     ) : type === "local" ? (
@@ -335,7 +338,7 @@ export default function FavouriteSongs(){
                     }}
                     style={{backgroundColor: gradientColors[0]}}
                     className="self-center rounded-full items-center justify-center mt-8 z-10">
-                    <Text className="text-[#00000080] text-lg font-poppins-semibold py-4 px-8">Shuffle play</Text>
+                    <Text className="text-[#ffffff] text-lg font-poppins-semibold py-4 px-8">Shuffle play</Text>
                 </TouchableOpacity>
             </Animated.View>
             

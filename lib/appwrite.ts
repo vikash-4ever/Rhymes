@@ -63,6 +63,37 @@ export const toggleLike = async (userDocId: string, songId: string) => {
     return liked;
 };
 
+export const toggleArtistLike = async (
+  userDocId: string,
+  artistName: string
+) => {
+
+  const doc = await databases.getDocument(
+    config.databaseId,
+    config.usersCollectionId,
+    userDocId
+  );
+
+  let likedArtists = doc.likedArtists || [];
+
+  if (likedArtists.includes(artistName)) {
+    likedArtists = likedArtists.filter(
+      (name: string) => name !== artistName
+    );
+  } else {
+    likedArtists = [artistName, ...likedArtists];
+  }
+
+  await databases.updateDocument(
+    config.databaseId,
+    config.usersCollectionId,
+    userDocId,
+    { likedArtists }
+  );
+
+  return likedArtists;
+};
+
 export const isSongLiked = (likedSongs: string[], songId: string) => {
   return likedSongs.includes(songId);
 }

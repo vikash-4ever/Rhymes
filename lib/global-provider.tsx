@@ -4,13 +4,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ID, Models } from "react-native-appwrite";
-import { account, config, databases, getLikedSongs, getUserPlaylists, Query, toggleLike } from "./appwrite";
+import { getArtistImage } from "./api/musicApis";
+import { account, config, databases, getLikedSongs, getUserPlaylists, Query, toggleArtistLike, toggleLike } from "./appwrite";
 
 type UserProfile = {
   $id: string;
   userId: string;
   email: string;
   likedAudios: string[];
+  likedArtists: string[];
   isGuest?: boolean;
 } | null;
 
@@ -26,13 +28,18 @@ type GlobalContextType = {
 
   recentlyPlayed: Song[];
   likedSongs: string[];
+  likedArtists: string[];
+  artistImages: Record<string, string>;
   setRecentlyPlayed: React.Dispatch<React.SetStateAction<Song[]>>;
   setLikedSongs: React.Dispatch<React.SetStateAction<string[]>>;
+  setArtistImages: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   handleToggleLike: (songId: string) => Promise<void>;
+  handleToggleArtist: (artistName: string) => Promise<void>;
 
   playlists: Playlist[];
   setPlaylists: React.Dispatch<React.SetStateAction<Playlist[]>>;
   loadPlaylists: () => Promise<void>;
+  loadArtistImage: (artist: string) => Promise<string | null>;
 };
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
@@ -43,9 +50,38 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
   const [likesLoading, setLikesLoading] = useState(true);
   const [recentlyPlayed, setRecentlyPlayed] = useState<Song[]>([]);
   const [likedSongs, setLikedSongs] = useState<string[]>([]);
+  const [likedArtists, setLikedArtists] = useState<string[]>([]);
+  const [artistImages, setArtistImages] = useState<Record<string, string>>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isGuestMode, setIsGuestMode] = useState(false);
   
+  const optimizeImage = (url: string) => {
+    return url.replace(/\d+x\d+/, "256x256");
+  };
+
+  const loadArtistImage = async (artist: string) => {
+    if (artistImages[artist]) {return artistImages[artist]};
+
+    try {
+
+      const image = await getArtistImage(artist);
+
+      if (image) {
+        const optimized = optimizeImage(image);
+
+        setArtistImages((prev) => ({
+          ...prev,
+          [artist]: optimized,
+        }));
+        return optimized;
+      }
+      
+      return null;
+    } catch (error) {
+      console.log("Artist image load error:", error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const loadUser = async () => {
@@ -62,6 +98,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
             userId: "guest",
             email: "Guest",
             likedAudios: [],
+            likedArtists: [],
             isGuest: true,
           });
           setLoading(false);
@@ -69,9 +106,6 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         const session = await account.get().catch(() => null);
-
-        console.log("GuestMode:", isGuest);
-        console.log("Session:", session);
 
         if (!session) {
           setUser(null);
@@ -107,6 +141,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
           userId: doc.userId,
           email: doc.email,
           likedAudios: doc.likedAudios || [],
+          likedArtists: doc.likedArtists || [],
         });
       } catch(error) {
         console.log("User fetch error : ", error);
@@ -129,11 +164,12 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
       }
     })();
   }, []);
-
+  
   // save recently played
   useEffect(() => {
     AsyncStorage.setItem("recentlyPlayed", JSON.stringify(recentlyPlayed));
   }, [recentlyPlayed]);
+
 
   const logout = async () => {
     try {
@@ -172,6 +208,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
         }
         const data = await getLikedSongs(user.$id);
         setLikedSongs(data || []);
+        setLikedArtists(user.likedArtists || []);
       } catch(error) {
         console.log("Likes Error.", error);
         setLikedSongs([]);
@@ -188,6 +225,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
       userId: "guest",
       email: "Guest",
       likedAudios: [],
+      likedArtists: [],
       isGuest: true,
     };
 
@@ -203,6 +241,20 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
     if(!user?.$id || user.isGuest) return;
     const updated = await toggleLike(user.$id, songId);
     setLikedSongs(updated);
+  };
+
+  const handleToggleArtist = async (
+    artistName: string
+  ) => {
+
+    if (!user?.$id || user.isGuest) return;
+
+    const updated = await toggleArtistLike(
+      user.$id,
+      artistName
+    );
+
+    setLikedArtists(updated);
   };
 
   const refreshUser = async () => {
@@ -245,6 +297,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
       userId: doc.userId,
       email: doc.email,
       likedAudios: doc.likedAudios || [],
+      likedArtists: doc.likedArtists || [],
     });
     } finally {
       setLoading(false);
@@ -296,7 +349,12 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
         setRecentlyPlayed,
         likedSongs,
         setLikedSongs,
+        likedArtists,
+        setArtistImages,
+        artistImages,
         handleToggleLike,
+        handleToggleArtist,
+        loadArtistImage,
         playlists,
         setPlaylists,
         loadPlaylists,

@@ -1,4 +1,5 @@
 import icons from "@/constants/icons";
+import images from "@/constants/images";
 import { createPlaylist, deletePlaylist, renamePlaylist, updatePlaylistThumbnail } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { pickAndCompressImage, uploadToCloudinary } from "@/lib/image";
@@ -14,7 +15,6 @@ type Route = { key: string; title: string };
 const PlaylistsRoute = () => {
   const router = useRouter();
   const {user, loadPlaylists, likedSongs, loading, likesLoading, playlists} = useGlobalContext();
-  console.log(likedSongs.length, "Liked Songs");
   const [showModal, setShowModal] = React.useState(false);
   const [playListName, setPlayListName] = React.useState("");
   const [optionsModal, setOptionsModal] = React.useState(false);
@@ -187,7 +187,7 @@ const PlaylistsRoute = () => {
             placeholderTextColor="#9ca3af"
             value={playListName}
             onChangeText={setPlayListName}
-            className="w-full border border-gray-300 rounded-md px-4 py-3 text-black mt-2"
+            className="w-full border border-gray-300 rounded-md px-4 py-3  font-poppins-medium text-black mt-2"
           />
 
           <View className="flex-col items-center gap-4 mt-6 mb-2 w-full">
@@ -405,21 +405,93 @@ const PlaylistsRoute = () => {
   );
 };
 
-const ArtistsRoute = () => (
-  <View className="flex-1 bg-primary-200 items-center justify-center">
-    <Text className="text-white">Your Artists</Text>
-  </View>
-);
+const ArtistsRoute = () => {
+
+  const router = useRouter();
+
+  const {likedArtists, artistImages, loadArtistImage } = useGlobalContext();
+
+  React.useEffect(() => {
+    likedArtists.forEach(loadArtistImage);
+  }, [likedArtists, loadArtistImage])
+
+  if (likedArtists.length === 0) {
+    return (
+      <View className="flex-1 bg-primary-200 items-center justify-center">
+        <Text className="text-primary-100 font-poppins-medium">
+          No artists added yet.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-primary-200 p-4">
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: 100,
+        }}
+      >
+        {likedArtists.map((artist, index) => (
+          <TouchableOpacity
+            key={index}
+            onPress={() =>
+              router.push({
+                pathname: "/favouriteSongs",
+                params: {
+                  type: "artist",
+                  title: artist,
+                  artist: artist,
+                  image: artistImages[artist] || "",
+                },
+              })
+            }
+            className="flex-row items-center mt-3"
+          >
+            <View className="h-14 w-14 rounded-full bg-[#ffffff20] items-center justify-center">
+              <Image
+                source={artistImages[artist] ? {
+                  uri: artistImages[artist],
+                  cache: "force-cache"
+                  } : images.artist
+                }
+                tintColor={artistImages[artist] ? undefined : "white"}
+                className="h-14 w-14 rounded-full"
+              />
+            </View>
+
+            <View className="ml-4">
+              <Text className="text-white text-lg font-poppins-medium">
+                {artist}
+              </Text>
+
+              <Text className="text-text2">
+                Artist
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+    </View>
+  );
+};
 
 const AlbumsRoute = () => (
   <View className="flex-1 bg-primary-200 items-center justify-center">
-    <Text className="text-white">Your Albums</Text>
+    <Text className="text-primary-100 font-poppins-medium">
+          This feature is Not Available yet.
+    </Text>
   </View>
 );
 
 const PodcastsRoute = () => (
   <View className="flex-1 bg-primary-200 items-center justify-center">
-    <Text className="text-white">Your Podcasts</Text>
+    <Text className="text-primary-100 font-poppins-medium">
+          This feature is Not Available yet.
+    </Text>
   </View>
 );
 
@@ -463,7 +535,7 @@ export default function Favourites() {
           tabStyle={{width: layout.width / routes.length}}
           contentContainerStyle={{flex:1, justifyContent:'space-between'}}
           renderLabel={({route, focused} : {route: Route; focused: boolean}) => (
-            <Text className={focused ? "text-white font-poppins-semibold" : "primary-100"}>
+            <Text style={{fontFamily: "Poppins-Medium", color: focused ? "white" : "#6f7684"}}>
               {route.title}
             </Text>
           )}
