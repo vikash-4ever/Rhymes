@@ -10,47 +10,81 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Animated, Image, Modal, Text, TouchableOpacity, View } from "react-native";
+import {
+    ActivityIndicator,
+    Animated,
+    Image,
+    Modal,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
 import ImageColors from "react-native-image-colors";
 
-export default function FavouriteSongs(){
+export default function FavouriteSongs() {
 
-    const {playShuffledQueue} = usePlayer();
-    const {type, id, title, artist, image} = useLocalSearchParams();
-    const {user, likedSongs, playlists, likedArtists, handleToggleArtist} = useGlobalContext();
+    const { playShuffledQueue } = usePlayer();
+
+    const { type, id, title, artist, image } = useLocalSearchParams();
+
+    const {
+        user,
+        likedSongs,
+        playlists,
+        likedArtists,
+        handleToggleArtist
+    } = useGlobalContext();
+
     const [songs, setSongs] = useState<Song[]>([]);
     const [songsLoading, setSongsLoading] = useState(false);
+
     const [songOptionsModal, setSongOptionsModal] = useState(false);
     const [selectedSong, setSelectedSong] = useState<Song | null>(null);
+
+    const [contentHeight, setContentHeight] = useState(340);
+
     const scrollY = useState(new Animated.Value(0))[0];
-    const playlist = React.useMemo(() => playlists.find(p => p.$id === id), [playlists, id]);
-    const [gradientColors, setGradientColors] = React.useState<readonly[string, string]>([
+
+    const playlist = React.useMemo(
+        () => playlists.find(p => p.$id === id),
+        [playlists, id]
+    );
+
+    const [gradientColors, setGradientColors] = React.useState<
+        readonly [string, string]
+    >([
         "#3f3a9b",
         "#000000"
     ]);
 
     const optimizeImage = (url: string) => {
-        return url.replace(
-            /\d+x\d+/,
-            "256x256"
-        );
+        return url.replace(/\d+x\d+/, "256x256");
     };
-    
+
     const imageUri = React.useMemo(() => {
-        const rawImage = Array.isArray(image) ? image[0] : image;
-        if (rawImage && typeof rawImage === 'string') {
-            // Swap 1000x1000 for 500x500 to save 75% memory
-            return optimizeImage(rawImage) ;
+
+        const rawImage = Array.isArray(image)
+            ? image[0]
+            : image;
+
+        if (rawImage && typeof rawImage === "string") {
+            return optimizeImage(rawImage);
         }
+
         return null;
+
     }, [image]);
 
-    const isArtistLiked = type === "artist" && likedArtists.includes(artist as string);
+    const isArtistLiked =
+        type === "artist" &&
+        likedArtists.includes(artist as string);
 
     const finalImageUri = imageUri;
 
-    const extractColors = React.useCallback( async (uri: string) => {
+    const extractColors = React.useCallback(async (uri: string) => {
+
         try {
+
             if (!uri) return;
 
             const result = await ImageColors.getColors(uri, {
@@ -60,18 +94,38 @@ export default function FavouriteSongs(){
             if (!result) return;
 
             if (result.platform === "android") {
-                setGradientColors([result.dominant || "#3f3a9b", result.average || "#000000"] as const);
-            } else if(result.platform === "ios"){
-                setGradientColors([result.background || "#3f3a9b", result.primary || "#000000"] as const);
+
+                setGradientColors([
+                    result.dominant || "#3f3a9b",
+                    result.average || "#000000"
+                ] as const);
+
+            } else if (result.platform === "ios") {
+
+                setGradientColors([
+                    result.background || "#3f3a9b",
+                    result.primary || "#000000"
+                ] as const);
+
             } else {
-                setGradientColors(["#3f3a9b", "#000000"] as const)
+
+                setGradientColors([
+                    "#3f3a9b",
+                    "#000000"
+                ] as const);
+
             }
-        } catch (error) { 
+
+        } catch (error) {
+
             console.log("Color extract error : ", error);
+
         }
+
     }, []);
 
     const sourceIds = React.useMemo(() => {
+
         if (type === "liked") {
             return likedSongs;
         }
@@ -81,6 +135,7 @@ export default function FavouriteSongs(){
         }
 
         return [];
+
     }, [type, likedSongs, playlist]);
 
     const textTranslateY = scrollY.interpolate({
@@ -102,31 +157,57 @@ export default function FavouriteSongs(){
     });
 
     React.useEffect(() => {
+
         if (type === "liked") {
-            setGradientColors(["#3f3a9b", "#000000"]);
+
+            setGradientColors([
+                "#3f3a9b",
+                "#000000"
+            ]);
+
             return;
+
         }
 
         if (type === "local") {
-            setGradientColors(["#3f3f46", "#000000"]);
+
+            setGradientColors([
+                "#3f3f46",
+                "#000000"
+            ]);
+
             return;
+
         }
 
-        setGradientColors(["#000000", "#000000"])
+        setGradientColors([
+            "#000000",
+            "#000000"
+        ]);
 
         if (type === "playlist" && playlist?.coverImage) {
+
             extractColors(playlist.coverImage);
+
         } else if (type === "artist" && imageUri) {
+
             extractColors(imageUri);
+
         }
-    },[playlist?.coverImage, type, imageUri]);
+
+    }, [playlist?.coverImage, type, imageUri]);
 
     useEffect(() => {
-
+        setSongs([]);
+        setSongsLoading(true);
         let mounted = true;
 
         const loadSongs = async () => {
-            setSongsLoading(true);
+
+            if(songs.length === 0) {
+                setSongsLoading(true);
+            }
+
             const cacheKey =
                 type === "artist"
                     ? `ARTIST_${artist}`
@@ -136,7 +217,8 @@ export default function FavouriteSongs(){
 
             try {
 
-                if (type === "playlist") {
+                if (type === "playlist" || type === "liked") {
+
                     const currentIds = JSON.stringify(sourceIds);
 
                     const savedIds = await AsyncStorage.getItem(
@@ -144,67 +226,108 @@ export default function FavouriteSongs(){
                     );
 
                     if (savedIds !== currentIds) {
+
                         await AsyncStorage.multiRemove([
                             cacheKey,
                             `${cacheKey}_IDS`
                         ]);
+
                     }
+
                 }
-                
+
                 const cached = await AsyncStorage.getItem(cacheKey);
 
                 if (cached) {
-                    if (mounted) setSongs(JSON.parse(cached));
+
+                    if (mounted) {
+                        setSongs(JSON.parse(cached));
+                    }
+
                     setSongsLoading(false);
 
                     return;
+
                 }
-                if( type === "artist") {
-                    const res = await getSongsByArtist(artist as string);
+
+                if (type === "artist") {
+
+                    const res = await getSongsByArtist(
+                        artist as string
+                    );
 
                     const artistSongs = Array.isArray(res)
                         ? res
                         : res?.results || [];
 
-                    if (mounted) setSongs(artistSongs);
+                    if (mounted) {
+                        setSongs(artistSongs);
+                    }
+
                     await AsyncStorage.setItem(
                         cacheKey,
                         JSON.stringify(artistSongs)
                     );
+
                     return;
+
                 }
 
                 if (!sourceIds || sourceIds.length === 0) {
-                    if (mounted) setSongs([]);
+
+                    if (mounted) {
+                        setSongs([]);
+                    }
+
                     return;
+
                 }
 
                 const res = await getSongsByIds(sourceIds);
-                    
-                if(!Array.isArray(res)) return;
 
-                const songMap = new Map(res.map((s: Song) => [s.id, s]));
-                const orderedSongs = sourceIds.map(id => songMap.get(id)).filter((s) : s is Song => Boolean(s));
-                if (mounted) setSongs(orderedSongs);
+                if (!Array.isArray(res)) return;
+
+                const songMap = new Map(
+                    res.map((s: Song) => [s.id, s])
+                );
+
+                const orderedSongs = sourceIds
+                    .map(id => songMap.get(id))
+                    .filter((s): s is Song => Boolean(s));
+
+                if (mounted) {
+                    setSongs(orderedSongs);
+                }
 
                 await AsyncStorage.multiSet([
                     [cacheKey, JSON.stringify(orderedSongs)],
                     [`${cacheKey}_IDS`, JSON.stringify(sourceIds)],
                 ]);
+
             } catch (error) {
+
                 console.log("Liked fetch error : ", error);
+
             } finally {
+
                 setSongsLoading(false);
+
             }
+
         };
+
         loadSongs();
+
         return () => {
             mounted = false;
         };
+
     }, [type, id, artist, sourceIds]);
 
     const renderedSongs = React.useMemo(() => {
+
         return songs.map((song, index) => (
+
             <SongItem
                 key={song.id ?? index}
                 song={song}
@@ -215,25 +338,75 @@ export default function FavouriteSongs(){
                     setSongOptionsModal(true);
                 }}
             />
+
         ));
+
     }, [songs]);
 
-    return(
+    return (
+
         <View className="flex-1 bg-black">
+
             <LinearGradient
                 colors={[gradientColors[0], "#000000"]}
                 start={{ x: 0.1, y: 0.1 }}
                 end={{ x: 0.1, y: 0.7 }}
                 className="absolute inset-0"
             />
-            <TouchableOpacity onPress={router.back} className="absolute z-10 top-0 left-0 h-14 w-16 items-center justify-center">
-                <Image source={icons.back} className="size-6" tintColor={"white"}/>
+
+            {/* Hidden measurement container */}
+            <View
+                pointerEvents="none"
+                style={{
+                    position: "absolute",
+                    opacity: 0,
+                    zIndex: -1,
+                    left: 0,
+                    right: 0,
+                    alignItems: "center",
+                    top: 18,
+                }}
+                onLayout={(e) => {
+                    setContentHeight(
+                        e.nativeEvent.layout.height
+                    );
+                }}
+            >
+
+                <View className="h-48 w-48 mt-12 items-center justify-center" />
+
+                <Text className="font-poppins-bold text-xl mt-6">
+                    {title || "Songs"}
+                </Text>
+
+                <TouchableOpacity className="mt-8">
+                    <Text className="text-lg py-4 px-8">
+                        Shuffle play
+                    </Text>
+                </TouchableOpacity>
+
+            </View>
+
+            {/* Back button */}
+            <TouchableOpacity
+                onPress={() => router.back()}
+                className="absolute z-10 top-0 left-0 h-14 w-16 items-center justify-center"
+            >
+                <Image
+                    source={icons.back}
+                    className="size-6"
+                    tintColor={"white"}
+                />
             </TouchableOpacity>
 
+            {/* Artist like */}
             {type === "artist" && (
+
                 <TouchableOpacity
                     onPress={() =>
-                        handleToggleArtist(artist as string)
+                        handleToggleArtist(
+                            artist as string
+                        )
                     }
                     className="absolute z-10 top-0 right-0 h-14 w-16 items-center justify-center"
                 >
@@ -247,144 +420,269 @@ export default function FavouriteSongs(){
                         className="size-6"
                     />
                 </TouchableOpacity>
+
             )}
 
+            {/* Image */}
             <Animated.View
                 style={{
-                    position:"absolute",
+                    position: "absolute",
                     top: 18,
                     alignSelf: "center",
                     opacity: imageOpacity,
                     zIndex: 100,
                 }}
             >
+
                 <View className="h-48 w-48 mt-12 items-center justify-center">
+
                     {type === "playlist" && playlist?.coverImage ? (
+
                         <Image
-                            source={{uri: playlist.coverImage}}
+                            source={{ uri: playlist.coverImage }}
                             className="h-full w-full rounded-sm"
                         />
+
                     ) : type === "artist" ? (
-                        <View 
-                            style={{ width: 168, height: 168, borderRadius: 96, overflow: 'hidden', backgroundColor: '#000000' }}
+
+                        <View
+                            style={{
+                                width: 168,
+                                height: 168,
+                                borderRadius: 96,
+                                overflow: "hidden",
+                                backgroundColor: "#000000"
+                            }}
                         >
+
                             <Image
-                                key={finalImageUri} // Force re-render if URI changes
-                                source={finalImageUri
-                                    ? {
-                                        uri: finalImageUri,
-                                        cache: "force-cache",
-                                    }
-                                    : images.artist
+                                key={finalImageUri}
+                                source={
+                                    finalImageUri
+                                        ? {
+                                            uri: finalImageUri,
+                                            cache: "force-cache",
+                                        }
+                                        : images.artist
                                 }
-                                tintColor={!finalImageUri ? "white" : undefined}
-                                style={{ width: 168, height: 168 }}
+                                tintColor={
+                                    !finalImageUri
+                                        ? "white"
+                                        : undefined
+                                }
+                                style={{
+                                    width: 168,
+                                    height: 168
+                                }}
                                 resizeMode="cover"
                                 resizeMethod="resize"
                                 fadeDuration={300}
                                 progressiveRenderingEnabled
                             />
-                        </View>    
+
+                        </View>
+
                     ) : type === "local" ? (
+
                         <>
                             <LinearGradient
-                                colors={["#bdc4d4", "#3f3f46"]}
-                                start={{ x: 0.1, y: 0.1 }}
-                                end={{ x: 1, y: 1 }}
-                                style={{ flex: 1, width: "100%" }}
+                                colors={[
+                                    "#bdc4d4",
+                                    "#3f3f46"
+                                ]}
+                                start={{
+                                    x: 0.1,
+                                    y: 0.1
+                                }}
+                                end={{
+                                    x: 1,
+                                    y: 1
+                                }}
+                                style={{
+                                    flex: 1,
+                                    width: "100%"
+                                }}
                             />
-                            <Image source={icons.disk} tintColor={"white"} className="absolute size-16"/>
+
+                            <Image
+                                source={icons.disk}
+                                tintColor={"white"}
+                                className="absolute size-16"
+                            />
                         </>
+
                     ) : (
-                            <>
-                                <LinearGradient
-                                    colors={["#bdc4d4", "#3f3a9b"]}
-                                    start={{ x: 0.1, y: 0.1 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={{ flex: 1, width: "100%" }}
-                                />
-                                <Image source={icons.heartFilled} tintColor={"white"} className="absolute size-16"/>
-                            </>
+
+                        <>
+                            <LinearGradient
+                                colors={[
+                                    "#bdc4d4",
+                                    "#3f3a9b"
+                                ]}
+                                start={{
+                                    x: 0.1,
+                                    y: 0.1
+                                }}
+                                end={{
+                                    x: 1,
+                                    y: 1
+                                }}
+                                style={{
+                                    flex: 1,
+                                    width: "100%"
+                                }}
+                            />
+
+                            <Image
+                                source={icons.heartFilled}
+                                tintColor={"white"}
+                                className="absolute size-16"
+                            />
+                        </>
+
                     )}
+
                 </View>
+
             </Animated.View>
 
+            {/* Title */}
             <Animated.Text
-                style= {{
+                style={{
                     position: "absolute",
                     top: "34%",
                     alignSelf: "center",
-                    transform:[{translateY: textTranslateY}]
+                    transform: [{ translateY: textTranslateY }]
                 }}
-                className="font-poppins-bold text-xl text-white" numberOfLines={2}>
-                    {title || "Songs"}
+                className="font-poppins-bold text-xl text-white"
+                numberOfLines={2}
+            >
+                {title || "Songs"}
             </Animated.Text>
 
+            {/* Shuffle button */}
             <Animated.View
-                style= {{
+                style={{
                     position: "absolute",
                     top: "36%",
                     alignSelf: "center",
                     opacity: imageOpacity,
-                    transform: [{translateY: textTranslateY}],
+                    transform: [{ translateY: textTranslateY }],
                     zIndex: 999,
                     elevation: 999
                 }}
             >
-                <TouchableOpacity 
+
+                <TouchableOpacity
                     onPress={async () => {
-                        if(songs.length === 0) return;
+
+                        if (songs.length === 0) return;
+
                         await playShuffledQueue(songs);
+
                     }}
-                    style={{backgroundColor: gradientColors[0]}}
-                    className="self-center rounded-full items-center justify-center mt-8 z-10">
-                    <Text className="text-[#ffffff] text-lg font-poppins-semibold py-4 px-8">Shuffle play</Text>
+                    style={{
+                        backgroundColor: gradientColors[0]
+                    }}
+                    className="self-center rounded-full items-center justify-center mt-8 z-10"
+                >
+
+                    <Text className="text-[#ffffff] text-lg font-poppins-semibold py-4 px-8">
+                        Shuffle play
+                    </Text>
+
                 </TouchableOpacity>
+
             </Animated.View>
-            
+
+            {/* Songs list */}
             {songsLoading ? (
+
                 <View className="flex-1 items-center justify-center mt-40">
-                    <ActivityIndicator size="large" color="white" />
+                    <ActivityIndicator
+                        size="large"
+                        color="white"
+                    />
                 </View>
+
             ) : songs.length === 0 ? (
+
                 <View className="flex-1 items-center justify-center mt-40">
+
                     <Text className="text-gray-600 text-lg font-poppins-medium">
                         Add your first Song.
                     </Text>
+
                 </View>
+
             ) : (
-                <Animated.ScrollView 
+
+                <Animated.ScrollView
                     className="w-full mt-1"
-                    style={{ transform: [{translateY: scrollTranslateY}], zIndex: 1}}
-                    contentContainerStyle={{ paddingTop: 325, paddingBottom: 660}}
-                    showsVerticalScrollIndicator= {false}
+                    style={{
+                        transform: [
+                            {
+                                translateY: scrollTranslateY
+                            }
+                        ],
+                        zIndex: 1
+                    }}
+                    contentContainerStyle={{
+                        paddingTop: contentHeight,
+                        paddingBottom: 660
+                    }}
+                    showsVerticalScrollIndicator={false}
                     onScroll={Animated.event(
-                        [{nativeEvent: {contentOffset: {y: scrollY}}}],
-                        {useNativeDriver: true}
+                        [{
+                            nativeEvent: {
+                                contentOffset: {
+                                    y: scrollY
+                                }
+                            }
+                        }],
+                        {
+                            useNativeDriver: true
+                        }
                     )}
                     scrollEventThrottle={16}
-                >   
+                >
+
                     {renderedSongs}
+
                 </Animated.ScrollView>
+
             )}
 
+            {/* Song options */}
             <Modal
                 visible={songOptionsModal}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setSongOptionsModal(false)}
-                >
+                onRequestClose={() =>
+                    setSongOptionsModal(false)
+                }
+            >
+
                 <TouchableOpacity
                     activeOpacity={1}
-                    onPress={() => setSongOptionsModal(false)}
+                    onPress={() =>
+                        setSongOptionsModal(false)
+                    }
                     className="flex-1 justify-end bg-[#00000080]"
                 >
+
                     <SongOptions
                         song={selectedSong}
-                        onClose={() => setSongOptionsModal(false)}
+                        onClose={() =>
+                            setSongOptionsModal(false)
+                        }
                     />
+
                 </TouchableOpacity>
-                </Modal>
+
+            </Modal>
+
         </View>
+
     );
 }

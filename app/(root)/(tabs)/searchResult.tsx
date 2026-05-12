@@ -37,6 +37,7 @@ export default function SearchResult() {
   const thumbnail = song?.thumbnail_url;
 
   useEffect(() => {
+    setBgColor("#000000");
     const extractColor = async () => {
       try{
         if(!thumbnail) return;
@@ -192,10 +193,11 @@ export default function SearchResult() {
         </Text>
 
         <TouchableOpacity
-          className="bg-gray-400 px-8 py-4 rounded-full mt-8"
           onPress={handlePress}
+          style={{backgroundColor: bgColor}}
+          className="px-8 py-4 rounded-full mt-8"
         >
-          <Text className="text-black text-lg font-poppins-semibold">
+          <Text className="text-white text-lg font-poppins-semibold">
             {buttonText}
           </Text>
         </TouchableOpacity>

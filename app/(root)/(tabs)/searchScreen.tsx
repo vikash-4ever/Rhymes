@@ -277,6 +277,7 @@ export default function SearchScreen() {
                                 keyExtractor={(item, index) =>
                                     item.id || index.toString()
                                 }
+                                contentContainerStyle={{paddingBottom: 80}}
                                 showsVerticalScrollIndicator={false}
                                 renderItem={({ item, index }) => (
                                     <TouchableOpacity
