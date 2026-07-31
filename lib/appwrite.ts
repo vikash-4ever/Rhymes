@@ -98,7 +98,10 @@ export const isSongLiked = (likedSongs: string[], songId: string) => {
   return likedSongs.includes(songId);
 }
 
-export const createPlaylist = async (userId: string, name: string) => {
+export const createPlaylist = async (userId: string, name: string, coverImage?: string) => {
+  if (userId === "guest") {
+    throw new Error("Guest users cannot create playlists.");
+  }
   return await databases.createDocument(
     config.databaseId,
     config.playlistsCollectionId,
@@ -107,6 +110,7 @@ export const createPlaylist = async (userId: string, name: string) => {
       name,
       userId,
       songIds: [],
+      coverImage: coverImage ?? "",
     }
   );
 };

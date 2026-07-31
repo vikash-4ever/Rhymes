@@ -8,4 +8,5 @@ export interface Song {
  duration_seconds: number
  play_count: number
  artists: { name: string }[]
+ hasLyrics: boolean
 }

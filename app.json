@@ -42,7 +42,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/rhymes.png",
-          "imageWidth": 200,
+          "imageWidth": 180,
           "resizeMode": "contain",
           "backgroundColor": "#000000",
           "dark": {

@@ -3,7 +3,7 @@ import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Image, Modal, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Image, Linking, Modal, Text, TouchableOpacity, View } from "react-native";
 
 type AppUser = {
     email?: string;
@@ -28,6 +28,22 @@ export default function SettingsScreen() {
             await logout();
         } catch (error) {
             console.log("Logout Error : ", error);
+        }
+    }
+
+    const openPortfolio = async () => {
+        const url = "https://www.rainon.in";
+
+        try {
+            const supported = await Linking.canOpenURL(url);
+
+            if (supported) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert("Unable to open the webpage.");
+            }
+        } catch (error) {
+            Alert.alert("Something went wrong.");
         }
     }
 
@@ -100,7 +116,7 @@ export default function SettingsScreen() {
                 </Text>
             </TouchableOpacity>
             <View className="border-t border-gray-400 mx-5 mt-10 pt-10">
-                <TouchableOpacity className="flex flex-row items-center py-4 gap-4">
+                <TouchableOpacity onPress={openPortfolio} className="flex flex-row items-center py-4 gap-4">
                     <Image source={icons.logo} tintColor={'white'} className="size-7"/>
                     <Text className="text-white text-lg font-poppins-semibold">Rhymes</Text>
                 </TouchableOpacity>
@@ -115,8 +131,14 @@ export default function SettingsScreen() {
                 animationType="fade"
                 onRequestClose={() => setShowModal(false)}
             >
-                <View className="flex h-full bg-[#00000008] justify-center items-center">
-                    <View className="flex w-[80%] bg-white items-center rounded-lg py-2">
+                <TouchableOpacity 
+                    activeOpacity={1}
+                    onPress={() => setShowModal(false)}
+                    className="flex-1 bg-[#00000080] justify-center items-center">
+                    <TouchableOpacity 
+                        activeOpacity={1}
+                        onPress={() =>{}}
+                        className="flex w-[80%] bg-white items-center rounded-lg py-2">
                         <Text className="text-black text-2xl font-poppins-semibold my-7">Log out</Text>
                         <Text className="px-8 text-center text-md font-poppins-medium">Are you sure you want to logout of Rhymes?</Text>
 
@@ -135,8 +157,8 @@ export default function SettingsScreen() {
                             <Text className="text-black text-lg font-poppins-semibold">Cancel</Text>
                         </TouchableOpacity>
                         </View>
-                    </View>
-                </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
             </Modal>
         </View>
     )

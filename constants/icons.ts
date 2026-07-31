@@ -11,8 +11,10 @@ import heart from "@/assets/icons/heart.png";
 import heartFilled from "@/assets/icons/heartFilled.png";
 import home from "@/assets/icons/home.png";
 import homeFilled from "@/assets/icons/homeFilled.png";
+import imageUpload from "@/assets/icons/imageUpload.png";
 import logo from "@/assets/icons/logo.png";
 import logout from "@/assets/icons/logout.png";
+import music from "@/assets/icons/music.png";
 import next from "@/assets/icons/next.png";
 import option from "@/assets/icons/option.png";
 import pause from "@/assets/icons/pause.png";
@@ -59,4 +61,6 @@ export default {
     soundWave,
     star,
     starFilled,
+    music,
+    imageUpload,
 }

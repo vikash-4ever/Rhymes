@@ -5,6 +5,7 @@ import { SplashScreen, Stack } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, StatusBar, StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import Toast from "react-native-toast-message";
 import "../global.css";
 
 function RootNavigator() {
@@ -19,16 +20,19 @@ function RootNavigator() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!!user || isGuestMode}>
-        <Stack.Screen name="(root)" />
-      </Stack.Protected>
-      
-      <Stack.Protected guard={!user && !isGuestMode}>
-        <Stack.Screen name="login/signIn" />
-      </Stack.Protected>
-      
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Protected guard={!!user || isGuestMode}>
+          <Stack.Screen name="(root)" />
+        </Stack.Protected>
+        
+        <Stack.Protected guard={!user && !isGuestMode}>
+          <Stack.Screen name="login/signIn" />
+        </Stack.Protected>
+        
+      </Stack>
+      <Toast/>
+    </>
   );
 }
 
@@ -58,7 +62,7 @@ export default function RootLayout() {
       <GlobalProvider>
         <PlayerProvider>
           <StatusBar barStyle="light-content" />
-          <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+          <SafeAreaView style={styles.safeArea} edges={['top']}>
             <RootNavigator />
           </SafeAreaView>
         </PlayerProvider>
@@ -70,12 +74,12 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
  safeArea: {
   flex:1,
-  backgroundColor: '#212121',
+  backgroundColor: '#000000',
  },
  loading: {
   flex: 1,
   justifyContent: 'center',
   alignItems: 'center',
-  backgroundColor: '#212121'
+  backgroundColor: '#000000'
  }
 })

@@ -2,11 +2,10 @@ import icons from "@/constants/icons";
 import { getSongsByIds, searchSongs } from "@/lib/api/musicApis";
 import { deleteSearchHistory, getSearchHistory, saveSearchHistory } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
-import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Image, Keyboard, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, Image, InteractionManager, Keyboard, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function SearchScreen() {
 
@@ -17,7 +16,6 @@ export default function SearchScreen() {
     const [debouncedQuery, setDebouncedQuery] = useState("");
     const [recentSongs, setRecentSongs] = useState<Song[]>([]);
     const [navigating, setNavigating] = useState(false);
-    const {playQueue, setPendingQueue} = usePlayer();
 
     const cancelTokenRef = useRef<AbortController | null>(null);
 
@@ -138,32 +136,25 @@ export default function SearchScreen() {
 
             Keyboard.dismiss();
 
-            // update local recent instantly
-            setRecentSongs((prev) => {
-
-                const filtered = prev.filter(
-                    (song) => song.id !== item.id
-                );
-
-                return [item, ...filtered];
-            });
-
-            // save in background
-            if (user && user.$id !== "guest") {
-                saveSearchHistory(
-                    user.$id,
-                    item.id
-                );
-            }
-
-            setPendingQueue(queue);
-
             router.push({
-                pathname: "/searchResult",
+                pathname: "/(root)/(tabs)/search/searchResult",
                 params: {
                     result: JSON.stringify(item),
+                    queue: JSON.stringify(queue),
                     index,
                 },
+            });
+
+            InteractionManager.runAfterInteractions(() => {
+
+                setRecentSongs(prev => {
+                    const filtered = prev.filter(song => song.id !== item.id);
+                    return [item, ...filtered];
+                });
+
+                if (user && user.$id !== "guest") {
+                    saveSearchHistory(user.$id, item.id);
+                }
             });
 
         } finally {
@@ -218,7 +209,7 @@ export default function SearchScreen() {
         <View className="flex h-full bg-primary-200">
             <View className="flex flex-row w-full h-14 bg-primary-300 items-center justify-between pr-2 gap-5">
                 <TouchableOpacity 
-                    onPress={() => router.push('/(root)/(tabs)/search')} 
+                    onPress={() => router.back()} 
                     className="items-center justify-center h-full w-14"
                 >
                     <Image source={icons.back} tintColor={'white'} className="size-5 my-5"/>
@@ -277,8 +268,9 @@ export default function SearchScreen() {
                                 keyExtractor={(item, index) =>
                                     item.id || index.toString()
                                 }
-                                contentContainerStyle={{paddingBottom: 80}}
+                                contentContainerStyle={{paddingBottom: 350}}
                                 showsVerticalScrollIndicator={false}
+                                keyboardDismissMode="on-drag"
                                 renderItem={({ item, index }) => (
                                     <TouchableOpacity
                                         className="w-full py-2"

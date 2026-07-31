@@ -1,8 +1,9 @@
+import GuestSignInModal from "@/components/GuestSignInModal";
 import { Playlist } from "@/types/playlist";
 import { Song } from "@/types/song";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { ID, Models } from "react-native-appwrite";
 import { getArtistImage } from "./api/musicApis";
 import { account, config, databases, getLikedSongs, getUserPlaylists, Query, toggleArtistLike, toggleLike } from "./appwrite";
@@ -11,6 +12,7 @@ type UserProfile = {
   $id: string;
   userId: string;
   email: string;
+  name: string;
   likedAudios: string[];
   likedArtists: string[];
   isGuest?: boolean;
@@ -21,10 +23,17 @@ type GlobalContextType = {
   loading: boolean;
   likesLoading: boolean;
   isGuestMode: boolean;
+
+  showGuestModal: boolean;
+  openGuestModal: () => void;
+  closeGuestModal: () => void;
+
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>;
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
   loginAsGuest: () => Promise<void>;
+  requireSignIn: () => boolean;
+  exitGuestMode: () => Promise<void>;
 
   recentlyPlayed: Song[];
   likedSongs: string[];
@@ -54,10 +63,39 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
   const [artistImages, setArtistImages] = useState<Record<string, string>>({});
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isGuestMode, setIsGuestMode] = useState(false);
+  const [showGuestModal, setShowGuestModal] = useState(false);
+
+  const openGuestModal = useCallback (() => {
+    setShowGuestModal(true);
+  }, []);
+
+  const closeGuestModal = useCallback (() => {
+    setShowGuestModal(false);
+  }, []);
+
+  const exitGuestMode = async () => {
+    await AsyncStorage.removeItem("guestMode");
+
+    setUser(null);
+    setIsGuestMode(false);
+  };
   
   const optimizeImage = (url: string) => {
     return url.replace(/\d+x\d+/, "256x256");
   };
+
+  const requireSignIn = useCallback(() => {
+    if (!user) {
+      return true;
+    }
+
+    if (user.isGuest) {
+      openGuestModal();
+      return true;
+    }
+
+    return false;
+  }, [user, openGuestModal]);
 
   const loadArtistImage = async (artist: string) => {
     if (artistImages[artist]) {return artistImages[artist]};
@@ -97,6 +135,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
             $id: "guest",
             userId: "guest",
             email: "Guest",
+            name: "",
             likedAudios: [],
             likedArtists: [],
             isGuest: true,
@@ -140,6 +179,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
           $id: doc.$id,
           userId: doc.userId,
           email: doc.email,
+          name: doc.name,
           likedAudios: doc.likedAudios || [],
           likedArtists: doc.likedArtists || [],
         });
@@ -187,7 +227,6 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
       await AsyncStorage.multiRemove(["recentlyPlayed", "guestMode"]);
       router.dismissAll();
       router.replace("/login/signIn");
-      console.log("Clean Logout Done!");
     } catch (error) {
       console.log("Logout Error : ", error);
     }
@@ -224,6 +263,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
       $id: "guest",
       userId: "guest",
       email: "Guest",
+      name: "",
       likedAudios: [],
       likedArtists: [],
       isGuest: true,
@@ -237,13 +277,13 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
     router.replace("/(root)/(tabs)");
   };
 
-  const handleToggleLike = async (songId: string) => {
+  const handleToggleLike = useCallback (async (songId: string) => {
     if(!user?.$id || user.isGuest) return;
     const updated = await toggleLike(user.$id, songId);
     setLikedSongs(updated);
-  };
+  }, [user]);
 
-  const handleToggleArtist = async (
+  const handleToggleArtist = useCallback (async (
     artistName: string
   ) => {
 
@@ -255,7 +295,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     setLikedArtists(updated);
-  };
+  }, [user]);
 
   const refreshUser = async () => {
     setLoading(true);
@@ -296,6 +336,7 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
       $id: doc.$id,
       userId: doc.userId,
       email: doc.email,
+      name: doc.name,
       likedAudios: doc.likedAudios || [],
       likedArtists: doc.likedArtists || [],
     });
@@ -304,11 +345,16 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  console.log("USER DOC ID:", user?.$id);
-  console.log("LIKED SONG IDS:", likedSongs);
-
   const loadPlaylists = async() => {
-    if (!user) return;
+    if (!user) {
+      setPlaylists([]);
+      return;
+    }
+
+    if (user.isGuest) {
+      setPlaylists([]);
+      return;
+    }
 
     try {
       const data = await getUserPlaylists(user.$id);
@@ -336,33 +382,56 @@ export const GlobalProvider = ({ children }: { children: React.ReactNode }) => {
     }
   },[user])
 
+  const value = useMemo(() => ({
+    user,
+    setUser,
+    refreshUser,
+    loading,
+    likesLoading,
+    logout,
+    recentlyPlayed,
+    setRecentlyPlayed,
+    likedSongs,
+    setLikedSongs,
+    likedArtists,
+    setArtistImages,
+    artistImages,
+    handleToggleLike,
+    handleToggleArtist,
+    loadArtistImage,
+    playlists,
+    setPlaylists,
+    loadPlaylists,
+    loginAsGuest,
+    exitGuestMode,
+    isGuestMode,
+    requireSignIn,
+    showGuestModal,
+    openGuestModal,
+    closeGuestModal,
+}), [
+    user,
+    loading,
+    likesLoading,
+    recentlyPlayed,
+    likedSongs,
+    likedArtists,
+    artistImages,
+    playlists,
+    isGuestMode,
+    showGuestModal,
+    handleToggleLike,
+    handleToggleArtist,
+    requireSignIn,
+    openGuestModal,
+    closeGuestModal,
+    exitGuestMode,
+]);
+
   return (
-    <GlobalContext.Provider
-      value={{
-        user,
-        setUser,
-        refreshUser,
-        loading,
-        likesLoading,
-        logout,
-        recentlyPlayed,
-        setRecentlyPlayed,
-        likedSongs,
-        setLikedSongs,
-        likedArtists,
-        setArtistImages,
-        artistImages,
-        handleToggleLike,
-        handleToggleArtist,
-        loadArtistImage,
-        playlists,
-        setPlaylists,
-        loadPlaylists,
-        loginAsGuest,
-        isGuestMode,  
-      }}
-    >
+    <GlobalContext.Provider value={value}>
       {children}
+      <GuestSignInModal/> 
     </GlobalContext.Provider>
   );
 };

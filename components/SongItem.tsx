@@ -1,5 +1,5 @@
 import icons from "@/constants/icons";
-import { usePlayer } from "@/lib/PlayerContext";
+import { QueueContext, usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
 import React from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
@@ -9,9 +9,10 @@ type Props = {
   index: number;
   songs: Song[];
   onOptionsPress?: () => void;
+  queueContext: QueueContext;
 };
 
-export function SongItem({song, index, songs, onOptionsPress} : Props) {
+export function SongItem({song, index, songs, onOptionsPress, queueContext} : Props) {
     const { playQueue, currentTrack } = usePlayer();
 
     const isPlaying = currentTrack?.id === song.id;
@@ -19,13 +20,13 @@ export function SongItem({song, index, songs, onOptionsPress} : Props) {
         <TouchableOpacity
             className="flex-row h-14 w-full justify-between mt-1"
             onPress={async () => {
-                await playQueue(songs, index);
+                await playQueue(songs, index, queueContext);
             }}
         >
           <View className="h-16 justify-center px-4 mr-14">
             <Text
               className={`text-lg font-poppins-semibold ${
-                isPlaying ? "text-white" : "text-gray-500"
+                isPlaying ? "text-white" : "text-['#ffffff72']"
               }`}
               numberOfLines={1}
             >
@@ -33,7 +34,7 @@ export function SongItem({song, index, songs, onOptionsPress} : Props) {
             </Text>
 
             <Text
-              className="text-sm font-poppins-light text-gray-500"
+              className="text-sm font-poppins-light text-['#ffffff44']"
               numberOfLines={1}
             >
               {song.artists?.map(a => a.name).join(", ")}
@@ -43,7 +44,7 @@ export function SongItem({song, index, songs, onOptionsPress} : Props) {
           onPress={onOptionsPress}
           className="absolute right-0 h-14 w-14 items-center justify-center"
         >
-        <Image source={icons.option} className="size-5" tintColor="gray" />
+        <Image source={icons.option} className="size-5" tintColor="white" />
       </TouchableOpacity>
     </TouchableOpacity>
     )

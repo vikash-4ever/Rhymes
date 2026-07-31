@@ -9,55 +9,134 @@ import { Route } from "expo-router/build/Route";
 import * as React from "react";
 import { ActivityIndicator, Image, Modal, ScrollView, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import { TabBar, TabView } from "react-native-tab-view";
+import Toast from "react-native-toast-message";
 
 type Route = { key: string; title: string };
 
+type PlaylistAction =
+  | "create"
+  | "delete"
+  | "rename"
+  | "thumbnail"
+  | null;
+
 const PlaylistsRoute = () => {
   const router = useRouter();
-  const {user, loadPlaylists, likedSongs, loading, likesLoading, playlists} = useGlobalContext();
+  const {user, requireSignIn, loadPlaylists, likedSongs, loading, likesLoading, playlists} = useGlobalContext();
   const [showModal, setShowModal] = React.useState(false);
   const [playListName, setPlayListName] = React.useState("");
   const [optionsModal, setOptionsModal] = React.useState(false);
   const [selectedPlaylist, setSelectedPlaylist] = React.useState<any>(null);
   const [renameModal, setRenameModal] = React.useState(false);
   const [newName, setNewName] = React.useState("");
+  const [playlistImage, setPlaylistImage] = React.useState<string | null>(null);
+  const [playlistAction, setPlaylistAction] = React.useState<PlaylistAction>(null);
+
+  const busy = playlistAction !== null;
+
+  const handlePickPlaylistImage = async () => {
+    const uri = await pickAndCompressImage();
+
+    if (!uri) return;
+
+    setPlaylistImage(uri);
+  };
 
   const handleCreatePlaylist = async () => {
-    if (!playListName.trim() || !user) return;
+    if (!playListName.trim()) return;
+
+    if (requireSignIn()) return;
+
+    setPlaylistAction("create");
 
     try {
-      await createPlaylist(user.$id, playListName.trim());
+      let imageUrl: string | undefined;
+
+      if (playlistImage) {
+        imageUrl = await uploadToCloudinary(playlistImage);
+      }
+
+      await createPlaylist(
+        user!.$id,
+        playListName.trim(),
+        imageUrl
+      );
+
       setPlayListName("");
+      setPlaylistImage(null);
       setShowModal(false);
+
       await loadPlaylists();
+      Toast.show({
+        type: "success",
+        text1: "Playlist created",
+      });
     } catch (error) {
-      console.log("Create Playlist Error :", error);
+      Toast.show({
+        type: "error",
+        text1: "Couldn't create playlist",
+      });
+      console.log("Create Playlist Error:", error);
+    } finally {
+      setPlaylistAction(null);
     }
   };
 
   const handleDeletePlaylist = async (playlistId: string) => {
+        
+    if (requireSignIn()) return;
+    setPlaylistAction("delete");
     try {
       await deletePlaylist(playlistId);
       await loadPlaylists();
+      Toast.show({
+        type: "success",
+        text1: "Playlist deleted",
+      });
     } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Couldn't delete playlist",
+      });
       console.log("Delete Playlist Error:", error);
+    } finally {
+      setPlaylistAction(null);
     }
   };
 
   const handleThumbnailUpdate = async () => {
-  if (!selectedPlaylist?.$id) return;
 
-  const compressedUri = await pickAndCompressImage();
-  if (!compressedUri) return;
+    if (requireSignIn()) return;
 
-  const imageUrl = await uploadToCloudinary(compressedUri);
+    if (!selectedPlaylist?.$id) return;
 
-  await updatePlaylistThumbnail(selectedPlaylist.$id, imageUrl);
-  await loadPlaylists();
+    setPlaylistAction("thumbnail");
+    try {
+      const compressedUri = await pickAndCompressImage();
+      if (!compressedUri) return;
+  
+      const imageUrl = await uploadToCloudinary(compressedUri);
+  
+      await updatePlaylistThumbnail(selectedPlaylist.$id, imageUrl);
+      await loadPlaylists();
+      Toast.show({
+        type: "success",
+        text1: "Cover updated",
+      });
+  
+      setOptionsModal(false);
+      setSelectedPlaylist(null);
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Couldn't update cover",
+      });
+      console.error(error);
+    } finally {
+      setPlaylistAction(null);
+    }
 
-  setOptionsModal(false);
-  setSelectedPlaylist(null);
-};
+  };
 
   if (loading || likesLoading) {
     return(
@@ -79,7 +158,13 @@ const PlaylistsRoute = () => {
           <Text className="text-text1 font-poppins-light text-xs ml-2">Alphabetical</Text>
         </View>
 
-        <TouchableOpacity onPress={() => setShowModal(true)} className="flex flex-row mt-2 items-center">
+        <TouchableOpacity 
+          onPress={() => {
+            if (requireSignIn()) return;
+            setShowModal(true);
+          }} 
+          className="flex flex-row mt-2 items-center"
+        >
           <View className="bg-[#ffffff30] h-14 w-14 items-center justify-center">
             <Image source={icons.add} tintColor={"white"} className="size-5" />
           </View>
@@ -88,7 +173,7 @@ const PlaylistsRoute = () => {
 
         <TouchableOpacity 
           onPress={() => router.push({
-            pathname: "/favouriteSongs",
+            pathname: "/(root)/(tabs)/favourites/listScreen",
             params: {
               type: "liked",
               title: "Favourite Songs"
@@ -112,7 +197,7 @@ const PlaylistsRoute = () => {
 
         <TouchableOpacity
           onPress={() => router.push({
-            pathname: "/favouriteSongs",
+            pathname: "/(root)/(tabs)/favourites/listScreen",
             params: {
               type: "local",
               title: "Local Audio Files",
@@ -135,14 +220,16 @@ const PlaylistsRoute = () => {
               <TouchableOpacity
                 key={playlist.$id}
                 onPress={() => router.push({
-                  pathname: "/favouriteSongs",
+                  pathname: "/(root)/(tabs)/favourites/listScreen",
                   params: {
                     type: "playlist",
                     id: playlist.$id,
-                    title: playlist.name
+                    title: playlist.name,
+                    coverImage: playlist.coverImage || "",
                   }
                 })}
                 onLongPress={() => {
+                  if (requireSignIn()) return;
                   setSelectedPlaylist(playlist);
                   setOptionsModal(true);
                 }}
@@ -150,7 +237,10 @@ const PlaylistsRoute = () => {
                 className="flex flex-row mt-2 items-center"
               >
                 <View className="bg-gray-700 h-14 w-14 items-center justify-center">
-                  <Image source={playlist.coverImage ? {uri: playlist.coverImage} : icons.disk} className="size-14" />
+                  <Image source={playlist.coverImage ? {uri: playlist.coverImage} : icons.music}
+                    className={playlist.coverImage ? "size-14" : "size-6"}
+                    tintColor={playlist.coverImage ? undefined : "white"}
+                  />
                 </View>
 
                 <View className="pl-4 justify-center">
@@ -174,41 +264,95 @@ const PlaylistsRoute = () => {
       animationType="fade"
       onRequestClose={() => setShowModal(false)}
     >
-      <View className="flex h-full bg-[#00000008] justify-center items-center">
+      <TouchableOpacity 
+        activeOpacity={1}
+        onPress={() => {
+          setShowModal(false);
+          setPlayListName("");
+          setPlaylistImage(null);
+        }}
+        className="flex h-full bg-[#00000080] justify-center items-center">
         
-        <View className="flex w-[80%] bg-white items-center rounded-lg py-4 px-4">
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => {}}
+          className="flex w-[80%] bg-white items-center rounded-lg py-4 px-4">
           
           <Text className="text-black text-2xl font-poppins-semibold my-4">
             Create Playlist
           </Text>
 
+          <TouchableOpacity
+              onPress={handlePickPlaylistImage}
+              disabled={busy}
+              className="self-center mb-5"
+          >
+              {playlistImage ? (
+                <View>
+                  <Image
+                      source={{ uri: playlistImage }}
+                      className="h-28 w-28 rounded-lg"
+                  />
+                  <TouchableOpacity
+                      onPress={() => setPlaylistImage(null)}
+                      className="absolute -top-2 -right-2 bg-black rounded-full h-7 w-7 items-center justify-center"
+                  >
+                      <Text className="text-white text-xl font-poppins-regular text-lg">×</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                  <View className="h-28 w-28 rounded-lg bg-[#00000008] items-center justify-center">
+                      <Image
+                          source={icons.imageUpload}
+                          className="size-10"
+                          tintColor="#9ca3af"
+                      />
+                      <Text className="mt-2 text-xs font-poppins-semibold text-[#9ca3af]">
+                          Choose Cover
+                      </Text>
+                  </View>
+              )}
+          </TouchableOpacity>
+
           <TextInput
             placeholder="Enter playlist name"
             placeholderTextColor="#9ca3af"
             value={playListName}
+            editable={!busy}
             onChangeText={setPlayListName}
-            className="w-full border border-gray-300 rounded-md px-4 py-3  font-poppins-medium text-black mt-2"
+            className="w-full border border-gray-300 rounded-md px-4 py-3 text-lg font-poppins-medium text-black mt-2"
           />
 
           <View className="flex-col items-center gap-4 mt-6 mb-2 w-full">
 
             <TouchableOpacity
               onPress={handleCreatePlaylist}
-              disabled={!playListName.trim()}
+              disabled={!playListName.trim() || busy}
               className={`w-full rounded-full items-center justify-center ${
                 playListName.trim() ? "bg-primary-300" : "bg-gray-600"
               }`}
             >
-              <Text className="text-white text-lg px-8 py-3 font-poppins-semibold">
-                Create
-              </Text>
+              {playlistAction === "create" ? (
+                 <View className="flex-row items-center py-3">
+                  <ActivityIndicator color="white" size="small" />
+                  <Text className="text-white text-lg ml-3 font-poppins-semibold">
+                    Creating...
+                  </Text>
+                </View>
+              ): (
+                <Text className="text-white text-lg px-8 py-3 font-poppins-semibold">
+                  Create
+                </Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => {
                 setShowModal(false);
                 setPlayListName("");
+                setPlaylistImage(null);
               }}
+              disabled={busy}
               className="p-2"
             >
               <Text className="text-black text-lg font-poppins-semibold">
@@ -218,9 +362,9 @@ const PlaylistsRoute = () => {
 
           </View>
 
-        </View>
+        </TouchableOpacity>
 
-      </View>
+      </TouchableOpacity>
     </Modal>
 
     <Modal
@@ -254,27 +398,39 @@ const PlaylistsRoute = () => {
           {/* DELETE */}
           <TouchableOpacity
             onPress={async () => {
-              await handleDeletePlaylist(selectedPlaylist?.$id);
+              if (!selectedPlaylist?.$id) return;
+              await handleDeletePlaylist(selectedPlaylist.$id);
               setOptionsModal(false);
               setSelectedPlaylist(null);
               setNewName("");
             }}
+            disabled={busy}
             className="py-3"
           >
-            <Text className="text-red-500 text-lg font-poppins-medium">
-              Delete
-            </Text>
+            {playlistAction === "delete" ? (
+              <View className="flex-row items-center">
+                <ActivityIndicator color="#ef4444" size="small" />
+                <Text className="text-red-500 text-lg ml-3 font-poppins-medium">
+                  Deleting...
+                </Text>
+              </View>
+            ) : (
+              <Text className="text-red-500 text-lg font-poppins-medium">
+                Delete
+              </Text>
+            )}
           </TouchableOpacity>
 
           {/* RENAME */}
           <TouchableOpacity
             onPress={() => {
               if(!selectedPlaylist) return;
-              setOptionsModal(false);
-              setRenameModal(true);
-              setNewName(selectedPlaylist?.name || "");
+                setOptionsModal(false);
+                setRenameModal(true);
+                setNewName(selectedPlaylist?.name || "");
             }}
             className="py-3"
+            disabled={busy}
           >
             <Text className="text-white text-lg font-poppins-medium">Rename</Text>
           </TouchableOpacity>
@@ -301,22 +457,20 @@ const PlaylistsRoute = () => {
 
           {/* THUMBNAIL */}
           <TouchableOpacity
-            onPress={async () => {
-              if (!selectedPlaylist?.$id) return;
-
-              const uri = await pickAndCompressImage();
-              if (!uri) return;
-
-              const imageUrl = await uploadToCloudinary(uri);
-
-              await updatePlaylistThumbnail(selectedPlaylist.$id, imageUrl);
-              await loadPlaylists();
-
-              setOptionsModal(false);
-            }}
+            onPress={handleThumbnailUpdate}
             className="py-3"
+            disabled={busy}
           >
-            <Text className="text-white text-lg font-poppins-medium">Edit Thumbnail</Text>
+            {playlistAction === "thumbnail" ? (
+              <View className="flex-row items-center">
+                <ActivityIndicator color="white" size="small" />
+                <Text className="text-white text-lg ml-3 font-poppins-medium">
+                  Updating...
+                </Text>
+              </View>
+            ) : (
+              <Text className="text-white text-lg font-poppins-medium">Edit Thumbnail</Text>
+            )}
           </TouchableOpacity>
 
           {/* CANCEL */}
@@ -327,6 +481,7 @@ const PlaylistsRoute = () => {
               setNewName("");
 
             }}
+            disabled={busy}
             className="py-4 mt-2"
           >
             <Text className="text-center text-gray-500 text-lg font-poppins-medium">
@@ -356,31 +511,61 @@ const PlaylistsRoute = () => {
             onChangeText={setNewName}
             placeholder="Enter playlist name"
             placeholderTextColor="#9ca3af"
-            className="w-full border border-gray-300 rounded-md px-4 py-3 text-black mt-2"
+            className="w-full border border-gray-300 rounded-md px-4 py-3 text-black text-lg font-poppins-medium mt-2"
           />
 
           <View className="flex-col items-center gap-4 mt-6 mb-2 w-full">
 
             <TouchableOpacity
               onPress={async () => {
-                if(!selectedPlaylist?.$id || !newName.trim()) return;
-                
-                await renamePlaylist(selectedPlaylist.$id, newName.trim());
-                await loadPlaylists();
 
-                setRenameModal(false);
-                setOptionsModal(false);
-                setSelectedPlaylist(null);
-                setNewName("");
+                if (requireSignIn()) return;
+
+                if (!selectedPlaylist?.$id || !newName.trim()) return;
+                
+                setPlaylistAction("rename");
+                try {
+                  await renamePlaylist(
+                    selectedPlaylist.$id,
+                    newName.trim()
+                  );
+                  await loadPlaylists();
+  
+                  setRenameModal(false);
+                  setOptionsModal(false);
+                  setSelectedPlaylist(null);
+                  setNewName("");
+                  Toast.show({
+                    type: "success",
+                    text1: "Playlist renamed",
+                  });
+                }catch(error) {
+                  Toast.show({
+                    type: "error",
+                    text1: "Couldn't rename playlist",
+                  });
+                  console.error(error);
+                } finally {
+                  setPlaylistAction(null);
+                }
               }}
-              disabled={!newName.trim()}
+              disabled={!newName.trim() || busy}
               className={`w-full rounded-full items-center justify-center ${
                 newName.trim() ? "bg-primary-300" : "bg-gray-600"
               }`}
             >
-              <Text className="text-white text-lg px-8 py-3 font-poppins-semibold">
-                Save
-              </Text>
+              {playlistAction === "rename" ? (
+                <View className="flex-row items-center py-3">
+                  <ActivityIndicator color="white" size="small" />
+                  <Text className="text-white text-lg ml-3 font-poppins-semibold">
+                    Saving...
+                  </Text>
+                </View>
+              ) : (
+                <Text className="text-white text-lg px-8 py-3 font-poppins-semibold">
+                  Save
+                </Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -389,6 +574,7 @@ const PlaylistsRoute = () => {
                 setSelectedPlaylist(null);
                 setNewName("");
               }}
+              disabled={busy}
               className="p-2"
             >
               <Text className="text-black text-lg font-poppins-semibold">
@@ -439,18 +625,19 @@ const ArtistsRoute = () => {
             key={index}
             onPress={() =>
               router.push({
-                pathname: "/favouriteSongs",
+                pathname: "/(root)/(tabs)/favourites/listScreen",
                 params: {
                   type: "artist",
                   title: artist,
                   artist: artist,
                   image: artistImages[artist] || "",
+                  source: "favourites"
                 },
               })
             }
-            className="flex-row items-center mt-3"
+            className="flex-row items-center mt-1 py-1"
           >
-            <View className="h-14 w-14 rounded-full bg-[#ffffff20] items-center justify-center">
+            <View className="h-16 w-16 rounded-full bg-[#ffffff20] items-center justify-center border-2 border-text2 p-[2px]">
               <Image
                 source={artistImages[artist] ? {
                   uri: artistImages[artist],
@@ -458,7 +645,7 @@ const ArtistsRoute = () => {
                   } : images.artist
                 }
                 tintColor={artistImages[artist] ? undefined : "white"}
-                className="h-14 w-14 rounded-full"
+                className="h-full w-full rounded-full"
               />
             </View>
 
@@ -479,22 +666,6 @@ const ArtistsRoute = () => {
   );
 };
 
-const AlbumsRoute = () => (
-  <View className="flex-1 bg-primary-200 items-center justify-center">
-    <Text className="text-primary-100 font-poppins-medium">
-          This feature is Not Available yet.
-    </Text>
-  </View>
-);
-
-const PodcastsRoute = () => (
-  <View className="flex-1 bg-primary-200 items-center justify-center">
-    <Text className="text-primary-100 font-poppins-medium">
-          This feature is Not Available yet.
-    </Text>
-  </View>
-);
-
 export default function Favourites() {
   const layout = useWindowDimensions();
   const [index, setIndex] = React.useState(0);
@@ -502,8 +673,6 @@ export default function Favourites() {
   const [routes] = React.useState<Route[]>([
     { key: "playlists", title: "Playlists" },
     { key: "artists", title: "Artists" },
-    { key: "albums", title: "Albums" },
-    { key: "podcasts", title: "Podcasts" },
   ]);
 
   const renderScene = ({route} : {route: Route}) =>  {
@@ -512,10 +681,6 @@ export default function Favourites() {
         return <PlaylistsRoute/>;
       case "artists":
         return <ArtistsRoute/>;
-      case "albums":
-        return <AlbumsRoute/>;
-      case "podcasts":
-        return <PodcastsRoute/>
         default:
           return null;
     }
@@ -535,8 +700,8 @@ export default function Favourites() {
           tabStyle={{width: layout.width / routes.length}}
           contentContainerStyle={{flex:1, justifyContent:'space-between'}}
           renderLabel={({route, focused} : {route: Route; focused: boolean}) => (
-            <Text style={{fontFamily: "Poppins-Medium", color: focused ? "white" : "#6f7684"}}>
-              {route.title}
+            <Text className="font-poppins-medium" style={{color: focused ? "white" : "#6f7684"}}>
+              {route.title} 
             </Text>
           )}
         />

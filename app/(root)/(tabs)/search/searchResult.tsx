@@ -14,21 +14,25 @@ import { Image, Text, TouchableOpacity, View } from "react-native";
 import ImageColors from "react-native-image-colors";
 
 export default function SearchResult() {
-  const {pendingQueue} = usePlayer();
-  const { result, index } = useLocalSearchParams();
-  const song:Song | null = result ? JSON.parse(result as string) : null;
-  const songQueue: Song[] = pendingQueue?.length > 0 
-    ? pendingQueue
-    : song
-    ? [song]
-    : [];
+  const { result, queue, index } = useLocalSearchParams();
+  const song: Song | null =
+    result
+        ? JSON.parse(result as string)
+        : null;
+
+const songQueue: Song[] =
+    queue
+        ? JSON.parse(queue as string)
+        : song
+        ? [song]
+        : [];
     
   const currentIndex = index ? Number(index): 0;
 
   const [bgColor, setBgColor] = useState("#000000");
   const [editorsPickDocId, setEditorsPickDocId] = useState<string | null>(null);
   const [loadingEditorsPick, setLoadingEditorsPick] = useState(false);
-  const {likedSongs, setLikedSongs, handleToggleLike, user} =useGlobalContext();
+  const {likedSongs, handleToggleLike, user} =useGlobalContext();
   const isAdmin = user?.$id === ADMIN_ID;
 
   const {playQueue ,playTrack, togglePlayPause, currentTrack, isPlaying} = usePlayer();

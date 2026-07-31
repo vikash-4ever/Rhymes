@@ -1,7 +1,7 @@
 import icons from "@/constants/icons";
 import { useGlobalContext } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
-import { useAudioPlayerStatus } from "expo-audio";
+import { useProgress } from "@rntp/player";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -20,12 +20,11 @@ export default function MiniPlayer() {
     isPlaying,
     togglePlayPause,
     playNext,
-    player,
     isPreparing,
   } = usePlayer();
 
-  const { currentTime = 0, duration = 0, isBuffering = false } =
-    useAudioPlayerStatus(player) || {};
+  const {position, duration} = useProgress(0.25);
+  
 
   if (!currentTrack) return null;
 
@@ -38,14 +37,13 @@ export default function MiniPlayer() {
   const artist = currentTrack.artists?.map((a) => a.name).join(", ") || "Unknown Artist";
   const textToScroll = `${title}  •  ${artist}`;
 
-  const {likedSongs, setLikedSongs, handleToggleLike} = useGlobalContext();
+  const {likedSongs, handleToggleLike} = useGlobalContext();
 
   const isLiked = currentTrack ? likedSongs.includes(currentTrack.id) : false;
 
   const handleLikePress = async () => {
     if(!currentTrack) return;
 
-    const alreadyLiked = likedSongs.includes(currentTrack.id);
     await handleToggleLike(currentTrack.id);
   };
 
@@ -78,14 +76,20 @@ export default function MiniPlayer() {
   }, [title, artist, textWidth, containerWidth]);
 
   // --- PROGRESS BAR ---
-  const progressPercentage = duration ? (currentTime / duration) * 100 : 0;
+  const safeDuration = duration > 0 ? duration : 1;
 
-  const shouldShowLoader = isPreparing || isBuffering;
+  const progressPercentage = Math.min(
+    100,
+    Math.max(0, (position / safeDuration) * 100)
+  );
+
+  const shouldShowLoader = isPreparing;
 
   return (
     <TouchableOpacity
       className="bg-primary-300 h-14 border-b border-black"
       onPress={() => router.push("/(root)/playingScreen")}
+      activeOpacity={0.8}
     >
       {/* Progress bar */}
       <View className="h-0.5 w-full bg-primary-100">

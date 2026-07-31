@@ -12,7 +12,8 @@ import React, { useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 export default function Index() {
-  const {recentlyPlayed, artistImages, loadArtistImage, setArtistImages} = useGlobalContext();
+
+  const {user, recentlyPlayed, artistImages, loadArtistImage, setArtistImages} = useGlobalContext();
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
   const [recentSongs, setRecentSongs] = useState<Song[]>([]);
   const [artists, setArtists] = useState<string[]>([]);
@@ -20,11 +21,53 @@ export default function Index() {
   const {playQueue} = usePlayer();
   const [editorsPickSongs, setEditorsPickSongs] = useState<Song[]>([]);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  const firstName = user?.name?.split(" ")[0];
 
   // trying to add local cache for popular & recommendations
   const CACHE_KEY = "HOME_CACHE";
   const CACHE_TTL = 1000 * 60 * 60 * 12;
   //--------------------------------------
+
+  const getGreetingData = () => {
+  const hour = new Date().getHours();
+
+  if (hour >= 5 && hour < 7)
+    return { text: "Good Morning", color: "#FFE08A" }; // Dawn
+
+  if (hour >= 7 && hour < 9)
+    return { text: "Good Morning", color: "#FFD166" }; // Sunrise
+
+  if (hour >= 9 && hour < 11)
+    return { text: "Good Morning", color: "#F4C96B" }; // Warm Gold
+
+  if (hour >= 11 && hour < 13)
+    return { text: "Good Afternoon", color: "#FFC98A" }; // Light Peach
+
+  if (hour >= 13 && hour < 15)
+    return { text: "Good Afternoon", color: "#FFB98F" }; // Soft Coral
+
+  if (hour >= 15 && hour < 17)
+    return { text: "Good Afternoon", color: "#F3A8A3" }; // Blush
+
+  if (hour >= 17 && hour < 18)
+    return { text: "Good Evening", color: "#E79BCB" }; // Pink Sunset
+
+  if (hour >= 18 && hour < 19)
+    return { text: "Good Evening", color: "#D89AF7" }; // Lavender
+
+  if (hour >= 19 && hour < 20)
+    return { text: "Good Evening", color: "#C29CFF" }; // Purple
+
+  if (hour >= 20 && hour < 22)
+    return { text: "Good Evening", color: "#A88BFF" }; // Twilight
+
+  if (hour >= 22 && hour < 24)
+    return { text: "Good Evening", color: "#8F97E8" }; // Moonlight
+
+  return { text: "Good Evening", color: "#7A8FCF" }; // Deep Night (0–5)
+};
+
+  const greeting = getGreetingData();
 
   React.useEffect(() => {
     let mounted = true;
@@ -43,8 +86,6 @@ export default function Index() {
               setEditorsPickSongs(parsed.editorsPickSongs || []);
               setArtistImages(parsed.artistImages || []);
               setInitialLoading(false);
-
-              return;
             }
           }
           
@@ -87,8 +128,8 @@ export default function Index() {
           });
 
           const topArtists = Object.entries(artistCount)
-          .sort((a, b) => b[1] - a[1]) // descending
-          .slice(0, 15) // only top 10-15
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 15) 
           .map(([name]) => name);
 
           if (mounted) {
@@ -144,49 +185,56 @@ export default function Index() {
   return (
         <ScrollView className="flex flex-1 h-full bg-primary-200" showsVerticalScrollIndicator={false}>
           <View className="flex-1 flex-row justify-between items-center pl-4 ">
-            <Text className="text-2xl font-poppins-semibold text-text1">
-              Recently Played
+            <Text
+              className="text-2xl font-poppins-light flex-1"
+              numberOfLines={1}
+            >
+              <Text style={{ color: greeting.color }}>
+                {`${greeting.text}, `}
+              </Text>
+              {!user?.isGuest && (
+                <Text className="text-text1 text-xl font-poppins-semibold">
+                  {`${firstName}`}
+                </Text>
+              )}
             </Text>
             <TouchableOpacity onPress={()=> router.push("/(root)/settingsScreen")} className="h-14 w-14 items-center justify-center">
               <Image source={icons.setting} tintColor={"white"} className="size-7"/>
             </TouchableOpacity>
           </View>
-          {recentlyPlayed.length === 0 ? (
-                <TouchableOpacity className="items-center justify-center h-16" onPress={() => router.push("/(root)/(tabs)/search")}>
-                  <Text
-                    className="text-text1 font-poppins-semibold"
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    Didn't play any audio! Go to Search.
-    
-                  </Text>
-                </TouchableOpacity>
-            ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4 ml-4">
-                  {recentlyPlayed.filter(Boolean).map((item, index) => (
-                    <TouchableOpacity
+          {recentlyPlayed.length > 0 && (
+              <View className="flex flex-col">
+                <View className="flex flex-row px-4 mt-2 items-center">
+                  <Text className="text-2xl text-text1 font-poppins-semibold ">Recently Played</Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4 ml-4">
+                    {recentlyPlayed.filter(Boolean).map((item, index) => (
+                      <TouchableOpacity
                       key={index}
-                      className="mr-4"
-                      onPress={async() => {
-                        await playQueue(recentlyPlayed, index);
-                        router.push("/playingScreen");
-                      }}
-                    >
-                      <Image
-                        source={item.thumbnail_url ? { uri: item.thumbnail_url } : require("@/constants/images").image1}
-                        className="h-32 w-32 rounded-sm"
-                      />
-                      <Text className="text-text1 font-bold w-32 mt-2" numberOfLines={1} ellipsizeMode="tail">
-                        {item.title}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}          
-              </ScrollView>
+                        className="mr-4"
+                        onPress={async() => {
+                          await playQueue(recentlyPlayed, index, {
+                            type: "recent",
+                            title: "Recent",
+                            route: "/(root)/(tabs)/home/listScreen",
+                          });
+                        }}
+                      >
+                        <Image
+                          source={item.thumbnail_url ? { uri: item.thumbnail_url } : require("@/constants/images").image1}
+                          className="h-32 w-32 rounded-sm"
+                          />
+                        <Text className="text-text1 font-bold w-32 mt-2" numberOfLines={1} ellipsizeMode="tail">
+                          {item.title}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}          
+                </ScrollView>
+              </View>
             )
           }
     
-          <View className="flex flex-row p-4 mt-6 items-center">
+          <View className={`flex flex-row p-4 items-center ${recentlyPlayed.length > 0 ? "mt-6" : "mt-0"}`}>
             <Text className="text-2xl text-text1 font-poppins-semibold ">Made for you</Text>
           </View>
     
@@ -195,8 +243,11 @@ export default function Index() {
               <TouchableOpacity 
                 key={index} 
                 onPress={async () => {
-                  await playQueue(recentSongs, index);
-                  router.push("/playingScreen");
+                  await playQueue(recentSongs, index, {
+                    type: "recommendation",
+                    title: "Made for you",
+                    route: "/(root)/(tabs)/home/listScreen",
+                  });
                 }} 
                 className="w-44 mr-4"
               >
@@ -218,8 +269,11 @@ export default function Index() {
                 key={index}
                 className="w-44 mr-4"
                 onPress={async ()=>{
-                  await playQueue(trendingSongs, index);
-                  router.push("/playingScreen");
+                  await playQueue(trendingSongs, index, {
+                    type: "trending",
+                    title: "Trending",
+                    route: "/(root)/(tabs)/home/listScreen",
+                  });
                 }}
                 >
                 <Image source={{uri: item.thumbnail_url}} className="h-44 w-44 rounded-sm"/>
@@ -240,8 +294,11 @@ export default function Index() {
                 key={item.id ?? index}
                 className="w-44 mr-4"
                 onPress={async () => {
-                  await playQueue(editorsPickSongs, index);
-                  router.push("/playingScreen");
+                  await playQueue(editorsPickSongs, index, {
+                    type: "editorsPick",
+                    title: "Editor's Pick",
+                    route: "/(root)/(tabs)/home/listScreen",
+                  });
                 }}  
               >
                 <Image source={{uri : item.thumbnail_url}} className="h-44 w-44 rounded-sm"/>
@@ -268,12 +325,13 @@ export default function Index() {
               <TouchableOpacity 
                 key={index}
                 onPress={()=> router.push({
-                  pathname: "/favouriteSongs",
+                  pathname: "/(root)/(tabs)/home/listScreen",
                   params: {
                     type: "artist",
                     title: artist,
                     artist: artist,
                     image: artistImages[artist] || "", 
+                    source: "home",
                   }
                 })}
                 className="mr-4 h-48 w-40 items-center">

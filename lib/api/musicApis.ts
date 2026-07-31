@@ -110,3 +110,21 @@ export const getAlbums = async () => {
   const res = await fetch(`${API_BASE}/albums`);
   return res.json();
 };
+
+/* ---------------- CATEGORIES ---------------- */
+
+export const getSongsByCategory = async (
+  category: string
+) => {
+
+  const url =
+    `${API_BASE}/songs/category/${encodeURIComponent(category)}`;
+
+  console.log("CATEGORY URL =", url);
+
+  const response = await fetch(url);
+
+  console.log("STATUS =", response.status);
+
+  return await response.json();
+};

@@ -21,12 +21,6 @@ export default function SignIN() {
   const translateX = useRef(new Animated.Value(0)).current;
   const { user, refreshUser, loginAsGuest } = useGlobalContext();
 
-  useEffect(() =>{
-    if(user) {
-      router.replace("/(root)/(tabs)")
-    }
-  },[user]);
-
   // Slide animation
   useEffect(() => {
     const interval = setInterval(() => {

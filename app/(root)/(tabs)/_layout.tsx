@@ -14,46 +14,42 @@ const TabIcon = ({ focused, icon, title} : {focused: boolean; icon: any; title: 
 )
 
 const AppTabs = () => {
-  const {currentTrack, isPlaying } = usePlayer();
+  const {currentTrack} = usePlayer();
 
     return(
       <View className="flex-1 bg-black">
         <Tabs screenOptions={{ tabBarShowLabel: false, tabBarStyle: { backgroundColor: "#000000", height:56, borderTopColor:'#6f7684'} }}>
-          <Tabs.Screen name="index" options={{
-            title: 'Home',
-            headerShown: false,
-            tabBarIcon: ({ focused }) => <TabIcon icon={focused ? icons.homeFilled : icons.home} focused={focused} title="Home"/>
-          }}/>
-          <Tabs.Screen name="search" options={{
-            title: 'Search',
-            headerShown: false,
-            tabBarIcon: ({ focused }) => <TabIcon icon={focused ? icons.searchFilled : icons.search} focused={focused} title="Search"/>
-          }}/>
-          <Tabs.Screen name="favourites" options={{
-            title: 'Favourites',
-            headerShown: false,
-            tabBarIcon: ({ focused }) => <TabIcon icon={focused ? icons.heartFilled: icons.heart} focused={focused} title="Favourites"/>
-          }}/>
-          <Tabs.Screen name="localAudio" options={{
-            href: null,
-            headerShown: false,
-          }}/>
-          <Tabs.Screen name="searchScreen" options={{
-            href: null,
-            headerShown: false,
-          }}/>
-          <Tabs.Screen name="searchResult" options={{
-            href: null,
-            headerShown: false,
-          }}/>
-          <Tabs.Screen name="favouriteSongs" options={{
-            href: null,
-            headerShown: false,
-          }}/>
-          <Tabs.Screen name="artistSongs" options={{
-            href: null,
-            headerShown: false,
-          }}/>
+          <Tabs.Screen
+            name="index"
+            options={{ 
+              headerShown: false,
+              tabBarIcon: ({ focused }) => <TabIcon icon={focused ? icons.homeFilled : icons.home} focused={focused} title="Home"/>
+             }}
+          />
+          <Tabs.Screen 
+            name="home" 
+            options={{
+              title: 'Home',
+              headerShown: false,
+              href: null
+            }}
+          />
+          <Tabs.Screen 
+            name="search" 
+            options={{
+              title: 'Search',
+              headerShown: false,
+              tabBarIcon: ({ focused }) => <TabIcon icon={focused ? icons.searchFilled : icons.search} focused={focused} title="Search"/>
+            }}
+          />
+          <Tabs.Screen
+            name="favourites"
+            options={{
+              title: "Favourites",
+              headerShown: false,
+              tabBarIcon: ({ focused }) => <TabIcon icon={focused ? icons.heartFilled : icons.heart} focused={focused} title="Favourites"/>
+            }}
+          />
         </Tabs>
 
         {currentTrack && (

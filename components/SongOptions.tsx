@@ -3,8 +3,7 @@ import {
   addEditorsPick,
   deleteEditorsPick,
   getEditorsPick,
-  toggleLike,
-  toggleSongInPlaylist,
+  toggleSongInPlaylist
 } from "@/lib/appwrite";
 
 import { ADMIN_ID } from "@/lib/config";
@@ -14,7 +13,8 @@ import { Song } from "@/types/song";
 
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Share, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Share, Text, TouchableOpacity, View } from "react-native";
+import Toast from "react-native-toast-message";
 
 type Props = {
   song: Song | null;
@@ -25,6 +25,8 @@ type Props = {
   showGoToArtist?: boolean;
 };
 
+type SongAction = "playlist" | "editorsPick" | null;
+
 export default function SongOptions({
   song,
   onClose,
@@ -33,20 +35,26 @@ export default function SongOptions({
   const {
     user,
     likedSongs,
-    setLikedSongs,
     playlists,
     loadPlaylists,
+    handleToggleLike,
   } = useGlobalContext();
 
-  const {addToNextQueue} = usePlayer();
+
+  const {currentTrack, addToNextQueue, navigationContext} = usePlayer();
 
   const isAdmin = user?.$id === ADMIN_ID;
 
-  const isLiked =
-    song ? likedSongs.includes(song.id) : false;
+  const isLiked = song ? likedSongs.includes(song.id) : false;
+
+  const canPlayNext = currentTrack && song?.id !== currentTrack.id;
 
   const [editorsPickDocId, setEditorsPickDocId] =
     useState<string | null>(null);
+
+  const [songAction, setSongAction] = useState<SongAction>(null);
+  const [updatingPlaylistId, setUpdatingPlaylistId] = useState<string | null>(null);
+  const busy = songAction !== null;
 
   useEffect(() => {
     const checkEditorsPick = async () => {
@@ -64,7 +72,7 @@ export default function SongOptions({
     };
 
     checkEditorsPick();
-  }, [song?.id]);
+  }, [song?.id, isAdmin]);
 
   if (!song) return null;
 
@@ -84,18 +92,11 @@ export default function SongOptions({
         className="py-2"
         onPress={async () => {
           if (!user) return;
-
-          const updated = await toggleLike(
-            user.$id,
-            song.id
-          );
-
-          setLikedSongs(updated);
-
+          await handleToggleLike(song.id);
           onClose();
         }}
       >
-        <Text className="text-white text-lg font-poppins-medium">
+        <Text className="text-white text-lg font-poppins-semibold">
           {isLiked
             ? "Remove from Favourite"
             : "Add to Favourite"}
@@ -112,22 +113,53 @@ export default function SongOptions({
           <TouchableOpacity
             key={playlist.$id}
             className="py-2"
+            disabled={busy}
             onPress={async () => {
 
-              await toggleSongInPlaylist(
-                playlist.$id,
-                song.id
-              );
+              setSongAction("playlist")
+              setUpdatingPlaylistId(playlist.$id);
 
-              await loadPlaylists();
-
-              onClose();
+              try {
+                await toggleSongInPlaylist(
+                  playlist.$id,
+                  song.id
+                );
+  
+                await loadPlaylists();
+  
+                Toast.show({
+                    type: "success",
+                    text1: isAdded
+                        ? `Removed from ${playlist.name}`
+                        : `Added to ${playlist.name}`,
+                });
+  
+                onClose();
+              } catch(error) {
+                Toast.show({
+                    type: "error",
+                    text1: "Couldn't update playlist",
+                });
+              } finally {
+                    setSongAction(null);
+                    setUpdatingPlaylistId(null);
+              }
             }}
           >
-            <Text className="text-white text-lg font-poppins-medium">
-              {isAdded ? "Remove from " : "Add to "}
-              {playlist.name}
-            </Text>
+            {(songAction === "playlist" && updatingPlaylistId === playlist.$id) ? (
+              <View className="flex-row items-center">
+                  <ActivityIndicator color="white" size="small" />
+                  <Text className="text-white text-lg ml-3 font-poppins-semibold">
+                      {isAdded ? "Removing from " : "Adding to "}
+                      {playlist.name}
+                  </Text>
+              </View>
+            ) : (
+              <Text className="text-white text-lg font-poppins-semibold">
+                {isAdded ? "Remove from " : "Add to "}
+                {playlist.name}
+              </Text>
+            )}
           </TouchableOpacity>
         );
       })}
@@ -136,34 +168,58 @@ export default function SongOptions({
       {isAdmin && (
         <TouchableOpacity
           className="py-2"
+          disabled={busy}
           onPress={async () => {
+            setSongAction("editorsPick")
 
-            if (editorsPickDocId) {
-
-              await deleteEditorsPick(
-                editorsPickDocId
-              );
-
-              setEditorsPickDocId(null);
-
-            } else {
-
-              const doc =
-                await addEditorsPick(song.id);
-
-              if (doc?.$id) {
-                setEditorsPickDocId(doc.$id);
+            try {
+              if (editorsPickDocId) {
+  
+                await deleteEditorsPick(
+                  editorsPickDocId
+                );
+  
+                setEditorsPickDocId(null);
+  
+              } else {
+  
+                const doc =
+                  await addEditorsPick(song.id);
+  
+                if (doc?.$id) {
+                  setEditorsPickDocId(doc.$id);
+                }
               }
-            }
+              Toast.show({
+                    type: "success",
+                    text1: editorsPickDocId
+                        ? "Removed from Editor's Pick"
+                        : "Added to Editor's Pick",
+                });
+              onClose(); 
+            } catch (error) {
+              Toast.show({
+                    type: "error",
+                    text1: "Couldn't update Editor's Pick",
+                });
+            } finally {setSongAction(null)}
 
-            onClose();
           }}
         >
-          <Text className="text-white text-lg font-poppins-medium">
-            {editorsPickDocId
-              ? "Remove from Editor's Pick"
-              : "Add to Editor's Pick"}
-          </Text>
+          { songAction === "editorsPick" ? (
+            <View className="flex-row items-center">
+              <ActivityIndicator color="white" size="small" />
+              <Text className="text-white text-lg ml-3 font-poppins-semibold">
+                  {editorsPickDocId ? "Removing from Editor's Pick" : "Adding to Editor's Pick"}
+              </Text>
+          </View>
+          ) : (
+            <Text className="text-white text-lg font-poppins-semibold">
+              {editorsPickDocId
+                ? "Remove from Editor's Pick"
+                : "Add to Editor's Pick"}
+            </Text>
+          )}
         </TouchableOpacity>
       )}
 
@@ -182,36 +238,51 @@ export default function SongOptions({
           if (!artistImage) {
             artistImage = "https://global.honda/en/RandD/assets/img/member/member_ninomiya.jpg"
           }
-
+        
           router.push({
-            pathname: "/favouriteSongs",
+            pathname: navigationContext.route,
             params: {
               type: "artist",
               title: firstArtist.name,
               artist: firstArtist.name,
               image: artistImage || "",
+              source: navigationContext.source,
             },
           });
           onClose();
         }}
       >
-        <Text className="text-white text-lg font-poppins-medium">
+        <Text className="text-white text-lg font-poppins-semibold">
           Go to Artist
         </Text>
       </TouchableOpacity>
 
       {/* PLAY NEXT */}
-      <TouchableOpacity
-        className="py-2"
-        onPress={() => {
-          addToNextQueue(song);
-          onClose();
-        }}
-      >
-        <Text className="text-white text-lg font-poppins-medium">
-          Play Next
-        </Text>
-      </TouchableOpacity>
+      {canPlayNext && (
+        <TouchableOpacity
+          className="py-2"
+          onPress={async() => {
+            try {
+              await addToNextQueue(song);
+              Toast.show({
+                      type: "success",
+                      text1: "Added to Play Next",
+                  });
+              onClose();
+            } catch (error) {
+              Toast.show({
+                type: "error",
+                text1: "Couldn't add to Play Next"
+              })
+            }
+          }}
+        >
+
+          <Text className="text-white text-lg font-poppins-semibold">
+            Play Next
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* SHARE */}
       <TouchableOpacity
@@ -228,7 +299,7 @@ export default function SongOptions({
           onClose();
         }}
       >
-        <Text className="text-white text-lg font-poppins-medium">
+        <Text className="text-white text-lg font-poppins-semibold">
           Share
         </Text>
       </TouchableOpacity>
@@ -238,7 +309,7 @@ export default function SongOptions({
         className="py-4 mt-2"
         onPress={onClose}
       >
-        <Text className="text-center text-gray-500 text-lg font-poppins-medium">
+        <Text className="text-center text-gray-500 text-lg font-poppins-semibold">
           Cancel
         </Text>
       </TouchableOpacity>
