@@ -1,15 +1,15 @@
 import icons from "@/constants/icons";
 import { getSongsByIds, searchSongs } from "@/lib/api/musicApis";
 import { deleteSearchHistory, getSearchHistory, saveSearchHistory } from "@/lib/appwrite";
-import { useGlobalContext } from "@/lib/global-provider";
+import { useAuth } from "@/lib/global-provider";
 import { Song } from "@/types/song";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Image, InteractionManager, Keyboard, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function SearchScreen() {
 
-    const {user} = useGlobalContext();
+    const {user} = useAuth();
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState<Song[]>([]);
@@ -19,27 +19,28 @@ export default function SearchScreen() {
 
     const cancelTokenRef = useRef<AbortController | null>(null);
 
-    const rankSongs = (songs: Song[], query: string) => {
-        const q = query.toLowerCase();
-
-        return songs
-            .map((song) => {
-            const title = song.title.toLowerCase();
-
-            let score = 0;
-
-            if (title.startsWith(q)) score += 100; // 🔥 highest priority
-            else if (title.includes(" " + q)) score += 70;
-            else if (title.includes(q)) score += 50;
-
-            // fuzzy (tu vs tum)
-            if (q.length >= 2 && title.includes(q.slice(0, 2))) score += 20;
-
-            return { song, score };
-            })
-            .sort((a, b) => b.score - a.score)
-            .map((item) => item.song);
-    };
+    const rankSongs = useCallback(
+        (songs: Song[], query: string) => {
+            const q = query.toLowerCase();
+    
+            return songs
+                .map((song) => {
+                const title = song.title.toLowerCase();
+    
+                let score = 0;
+    
+                if (title.startsWith(q)) score += 100; // 🔥 highest priority
+                else if (title.includes(" " + q)) score += 70;
+                else if (title.includes(q)) score += 50;
+    
+                // fuzzy (tu vs tum)
+                if (q.length >= 2 && title.includes(q.slice(0, 2))) score += 20;
+    
+                return { song, score };
+                })
+                .sort((a, b) => b.score - a.score)
+                .map((item) => item.song);
+        }, []) 
 
     useEffect(() => {
 
@@ -120,7 +121,7 @@ export default function SearchScreen() {
 
             fetchResults();
 
-    }, [debouncedQuery]);
+    }, [debouncedQuery, rankSongs]);
 
     const handleSongPress = async (
         item: Song,

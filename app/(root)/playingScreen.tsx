@@ -1,7 +1,7 @@
 import SongOptions from "@/components/SongOptions";
 import icons from "@/constants/icons";
 import images from "@/constants/images";
-import { useGlobalContext } from "@/lib/global-provider";
+import { useLikes } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Slider } from "@miblanchard/react-native-slider";
 import { useProgress } from "@rntp/player";
@@ -86,7 +86,9 @@ export default function PlayingScreen() {
   const progress = useProgress(0.25);
 
   const { position: playbackPosition, duration } = progress;
+
   const displayTrack = pendingTrack ?? currentTrack;
+
   const [lyrics, setLyrics] = useState<string | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [lyricsLines, setLyricsLines] = useState<LyricLine[]>([]);
@@ -94,12 +96,14 @@ export default function PlayingScreen() {
   const seekingRef = useRef<number | null>(null);
   
   useEffect(() => {
+    let cancelled = false;
 
     const loadLyrics = async () => {
 
       if (!displayTrack?.lyrics_url) {
         setLyrics(null);
         setLyricsLines([]);
+        setLyricsLoading(false);
         return;
       }
 
@@ -108,28 +112,31 @@ export default function PlayingScreen() {
         setLyricsLoading(true);
 
         const response = await fetch(displayTrack.lyrics_url);
-
         const text = await response.text();
 
-        setLyrics(text);
-
-        const parsed = parseLrc(text);
-
-        setLyricsLines(parsed);
-
+        if (!cancelled) {
+          setLyrics(text);
+          setLyricsLines(parseLrc(text));
+        }
       } catch (error) {
+        if(!cancelled) {
           setLyrics(null);
           setLyricsLines([]);
+        }
       } finally {
-
-        setLyricsLoading(false);
-
+        if(!cancelled) {
+          setLyricsLoading(false);
+        }
       }
+
     };
 
     loadLyrics();
+    return() => {
+      cancelled = true;
+    }
 
-  }, [displayTrack]);
+  }, [displayTrack?.lyrics_url]);
 
   const cleanLyrics = useMemo(() => {
     return lyrics
@@ -141,9 +148,14 @@ export default function PlayingScreen() {
       ?.trim();
   }, [lyrics]);
 
-  const {likedSongs, handleToggleLike} = useGlobalContext();
+  const {likedSongs, handleToggleLike} = useLikes();
 
-  const isLiked = displayTrack ? likedSongs.includes(displayTrack!.id) : false;
+  const isLiked = useMemo(() =>
+    (displayTrack 
+      ? likedSongs.includes(displayTrack.id)
+      : false
+    ), [displayTrack?.id, likedSongs]);
+
   const [isSliding, setIsSliding] = useState(false);
   const [slideValue, setSlideValue] = useState(0);
   const [showOptions, setShowOptions] = useState(false);
@@ -154,7 +166,9 @@ export default function PlayingScreen() {
   }, [displayTrack, handleToggleLike]);
 
   
-  const sliderPosition = isSliding ? slideValue : playbackPosition;
+  const sliderPosition = useMemo(() => (
+    isSliding ? slideValue : playbackPosition
+  ), [isSliding, slideValue, playbackPosition]); 
   
   const total = useMemo(() => (duration > 0 ? duration : 1),
   [duration]); 
@@ -204,8 +218,9 @@ export default function PlayingScreen() {
     }
   }, [seekTo]);
   
-  const showLoader = isPreparing;
-  const playIcon = isPlaying ? icons.pause : icons.play;
+  const playIcon = useMemo(() => (
+    isPlaying ? icons.pause : icons.play
+  ), [isPlaying]); 
   
   if (!displayTrack) {
     return (
@@ -241,7 +256,7 @@ export default function PlayingScreen() {
               numberOfLines={1}
               ellipsizeMode="tail"
             >
-              {showLoader ? "Loading…" : `from ${queueContext.title}`}
+              {isPreparing ? "Loading…" : `from ${queueContext.title}`}
             </Text>
           </View>
 
@@ -347,7 +362,7 @@ export default function PlayingScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity onPress={togglePlayPause} className="w-20 h-20 bg-white rounded-full items-center justify-center">
-            {showLoader ? (
+            {isPreparing ? (
               <ActivityIndicator size="small" color="#000" />
             ) : (
               <View>

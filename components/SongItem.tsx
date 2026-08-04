@@ -15,13 +15,22 @@ type Props = {
 export function SongItem({song, index, songs, onOptionsPress, queueContext} : Props) {
     const { playQueue, currentTrack } = usePlayer();
 
-    const isPlaying = currentTrack?.id === song.id;
+    const isPlaying = React.useMemo(() => (
+      currentTrack?.id === song.id
+    ), [currentTrack?.id, song.id]);
+
+    const handlePress = React.useCallback(async () => {
+      await playQueue(songs, index, queueContext);
+    }, [playQueue, songs, index, queueContext]);
+
+    const artists = React.useMemo(() => (
+      song.artists?.map(a => a.name).join(", ") ?? ""
+    ), [song.artists]);
+
     return(
         <TouchableOpacity
             className="flex-row h-14 w-full justify-between mt-1"
-            onPress={async () => {
-                await playQueue(songs, index, queueContext);
-            }}
+            onPress={handlePress}
         >
           <View className="h-16 justify-center px-4 mr-14">
             <Text
@@ -37,7 +46,7 @@ export function SongItem({song, index, songs, onOptionsPress, queueContext} : Pr
               className="text-sm font-poppins-light text-['#ffffff44']"
               numberOfLines={1}
             >
-              {song.artists?.map(a => a.name).join(", ")}
+              {artists}
             </Text>
           </View>
         <TouchableOpacity
@@ -50,4 +59,12 @@ export function SongItem({song, index, songs, onOptionsPress, queueContext} : Pr
     )
 }
 
-export default React.memo(SongItem);
+export default React.memo(SongItem, (prev, next) => {
+  return (
+    prev.song.id === next.song.id &&
+    prev.index === next.index &&
+    prev.onOptionsPress === next.onOptionsPress &&
+    prev.queueContext === next.queueContext &&
+    prev.songs === next.songs
+  );
+});

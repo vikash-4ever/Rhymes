@@ -1,4 +1,4 @@
-import { GlobalProvider, useGlobalContext } from "@/lib/global-provider";
+import { GlobalProvider, useAuth } from "@/lib/global-provider";
 import { PlayerProvider } from "@/lib/PlayerContext";
 import { useFonts } from "expo-font";
 import { SplashScreen, Stack } from "expo-router";
@@ -9,7 +9,7 @@ import Toast from "react-native-toast-message";
 import "../global.css";
 
 function RootNavigator() {
-  const { user, loading, isGuestMode } = useGlobalContext();
+  const { user, loading, isGuestMode } = useAuth();
 
   if (loading) {
     return (

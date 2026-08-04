@@ -1,11 +1,12 @@
-import { useGlobalContext } from "@/lib/global-provider";
+import { useAuth, useGuest } from "@/lib/global-provider";
 import { router } from "expo-router";
 import { Modal, Text, TouchableOpacity, View } from "react-native";
 
 
 export default function GuestSignInModal(){
 
-    const {showGuestModal, exitGuestMode, closeGuestModal} = useGlobalContext();
+    const {showGuestModal, closeGuestModal} = useGuest();
+    const { exitGuestMode } = useAuth();
 
     return(
         <Modal

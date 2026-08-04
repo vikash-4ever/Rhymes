@@ -1,11 +1,11 @@
 import icons from "@/constants/icons";
 import images from "@/constants/images";
 import { createPlaylist, deletePlaylist, renamePlaylist, updatePlaylistThumbnail } from "@/lib/appwrite";
-import { useGlobalContext } from "@/lib/global-provider";
+import { useAuth, useGuest, useLikes, usePlaylists } from "@/lib/global-provider";
 import { pickAndCompressImage, uploadToCloudinary } from "@/lib/image";
+import { Playlist } from "@/types/playlist";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { Route } from "expo-router/build/Route";
 import * as React from "react";
 import { ActivityIndicator, Image, Modal, ScrollView, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import { TabBar, TabView } from "react-native-tab-view";
@@ -22,11 +22,14 @@ type PlaylistAction =
 
 const PlaylistsRoute = () => {
   const router = useRouter();
-  const {user, requireSignIn, loadPlaylists, likedSongs, loading, likesLoading, playlists} = useGlobalContext();
+  const { user, loading } = useAuth();
+  const { requireSignIn } = useGuest();
+  const { likedSongs, likesLoading } = useLikes();
+  const { loadPlaylists, playlists } = usePlaylists();
   const [showModal, setShowModal] = React.useState(false);
   const [playListName, setPlayListName] = React.useState("");
   const [optionsModal, setOptionsModal] = React.useState(false);
-  const [selectedPlaylist, setSelectedPlaylist] = React.useState<any>(null);
+  const [selectedPlaylist, setSelectedPlaylist] = React.useState<Playlist | null>(null);
   const [renameModal, setRenameModal] = React.useState(false);
   const [newName, setNewName] = React.useState("");
   const [playlistImage, setPlaylistImage] = React.useState<string | null>(null);
@@ -34,109 +37,150 @@ const PlaylistsRoute = () => {
 
   const busy = playlistAction !== null;
 
-  const handlePickPlaylistImage = async () => {
+  const handlePickPlaylistImage = React.useCallback( async () => {
     const uri = await pickAndCompressImage();
-
     if (!uri) return;
-
     setPlaylistImage(uri);
-  };
+  }, []); 
 
-  const handleCreatePlaylist = async () => {
-    if (!playListName.trim()) return;
-
-    if (requireSignIn()) return;
-
-    setPlaylistAction("create");
-
-    try {
-      let imageUrl: string | undefined;
-
-      if (playlistImage) {
-        imageUrl = await uploadToCloudinary(playlistImage);
+  const handleCreatePlaylist = React.useCallback(
+    async () => {
+      if (!playListName.trim()) return;
+      if (requireSignIn()) return;
+      setPlaylistAction("create");
+      try {
+        let imageUrl: string | undefined;
+  
+        if (playlistImage) {
+          imageUrl = await uploadToCloudinary(playlistImage);
+        }
+  
+        await createPlaylist(
+          user!.$id,
+          playListName.trim(),
+          imageUrl
+        );
+  
+        setPlayListName("");
+        setPlaylistImage(null);
+        setShowModal(false);
+  
+        await loadPlaylists();
+        Toast.show({
+          type: "success",
+          text1: "Playlist created",
+        });
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "Couldn't create playlist",
+        });
+        console.log("Create Playlist Error:", error);
+      } finally {
+        setPlaylistAction(null);
       }
+    }, [playListName, playlistImage, user, requireSignIn, loadPlaylists]); 
 
-      await createPlaylist(
-        user!.$id,
-        playListName.trim(),
-        imageUrl
-      );
+  const handleDeletePlaylist = React.useCallback(
+    async (playlistId: string) => {
+          
+      if (requireSignIn()) return;
+      setPlaylistAction("delete");
+      try {
+        await deletePlaylist(playlistId);
+        await loadPlaylists();
+        Toast.show({
+          type: "success",
+          text1: "Playlist deleted",
+        });
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "Couldn't delete playlist",
+        });
+        console.log("Delete Playlist Error:", error);
+      } finally {
+        setPlaylistAction(null);
+      }
+    }, [requireSignIn, loadPlaylists]);
 
-      setPlayListName("");
-      setPlaylistImage(null);
-      setShowModal(false);
-
-      await loadPlaylists();
-      Toast.show({
-        type: "success",
-        text1: "Playlist created",
-      });
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Couldn't create playlist",
-      });
-      console.log("Create Playlist Error:", error);
-    } finally {
-      setPlaylistAction(null);
-    }
-  };
-
-  const handleDeletePlaylist = async (playlistId: string) => {
-        
-    if (requireSignIn()) return;
-    setPlaylistAction("delete");
-    try {
-      await deletePlaylist(playlistId);
-      await loadPlaylists();
-      Toast.show({
-        type: "success",
-        text1: "Playlist deleted",
-      });
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Couldn't delete playlist",
-      });
-      console.log("Delete Playlist Error:", error);
-    } finally {
-      setPlaylistAction(null);
-    }
-  };
-
-  const handleThumbnailUpdate = async () => {
-
-    if (requireSignIn()) return;
-
-    if (!selectedPlaylist?.$id) return;
-
-    setPlaylistAction("thumbnail");
-    try {
-      const compressedUri = await pickAndCompressImage();
-      if (!compressedUri) return;
+  const handleThumbnailUpdate = React.useCallback(
+    async () => {
   
-      const imageUrl = await uploadToCloudinary(compressedUri);
+      if (requireSignIn()) return;
   
-      await updatePlaylistThumbnail(selectedPlaylist.$id, imageUrl);
-      await loadPlaylists();
-      Toast.show({
-        type: "success",
-        text1: "Cover updated",
-      });
+      if (!selectedPlaylist?.$id) return;
   
-      setOptionsModal(false);
-      setSelectedPlaylist(null);
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Couldn't update cover",
-      });
-      console.error(error);
-    } finally {
-      setPlaylistAction(null);
-    }
+      setPlaylistAction("thumbnail");
+      try {
+        const compressedUri = await pickAndCompressImage();
+        if (!compressedUri) return;
+    
+        const imageUrl = await uploadToCloudinary(compressedUri);
+    
+        await updatePlaylistThumbnail(selectedPlaylist.$id, imageUrl);
+        await loadPlaylists();
+        Toast.show({
+          type: "success",
+          text1: "Cover updated",
+        });
+    
+        setOptionsModal(false);
+        setSelectedPlaylist(null);
+      } catch (error) {
+        Toast.show({
+          type: "error",
+          text1: "Couldn't update cover",
+        });
+        console.error(error);
+      } finally {
+        setPlaylistAction(null);
+      }
+    }, [requireSignIn, selectedPlaylist, loadPlaylists]);
 
-  };
+  const handleRenamePlaylist = React.useCallback(
+    async () => {
+
+                if (requireSignIn()) return;
+
+                if (!selectedPlaylist?.$id || !newName.trim()) return;
+                
+                setPlaylistAction("rename");
+                try {
+                  await renamePlaylist(
+                    selectedPlaylist.$id,
+                    newName.trim()
+                  );
+                  await loadPlaylists();
+  
+                  setRenameModal(false);
+                  setOptionsModal(false);
+                  setSelectedPlaylist(null);
+                  setNewName("");
+                  Toast.show({
+                    type: "success",
+                    text1: "Playlist renamed",
+                  });
+                }catch(error) {
+                  Toast.show({
+                    type: "error",
+                    text1: "Couldn't rename playlist",
+                  });
+                  console.error(error);
+                } finally {
+                  setPlaylistAction(null);
+                }
+              }, [requireSignIn, selectedPlaylist, newName, loadPlaylists]);
+
+    const handleConfirmDelete = React.useCallback(
+      async () => {
+              if (!selectedPlaylist?.$id) return;
+              await handleDeletePlaylist(selectedPlaylist.$id);
+              setOptionsModal(false);
+              setSelectedPlaylist(null);
+              setNewName("");
+            }, [selectedPlaylist, handleDeletePlaylist]
+    )
 
   if (loading || likesLoading) {
     return(
@@ -397,13 +441,7 @@ const PlaylistsRoute = () => {
 
           {/* DELETE */}
           <TouchableOpacity
-            onPress={async () => {
-              if (!selectedPlaylist?.$id) return;
-              await handleDeletePlaylist(selectedPlaylist.$id);
-              setOptionsModal(false);
-              setSelectedPlaylist(null);
-              setNewName("");
-            }}
+            onPress={handleConfirmDelete}
             disabled={busy}
             className="py-3"
           >
@@ -517,38 +555,7 @@ const PlaylistsRoute = () => {
           <View className="flex-col items-center gap-4 mt-6 mb-2 w-full">
 
             <TouchableOpacity
-              onPress={async () => {
-
-                if (requireSignIn()) return;
-
-                if (!selectedPlaylist?.$id || !newName.trim()) return;
-                
-                setPlaylistAction("rename");
-                try {
-                  await renamePlaylist(
-                    selectedPlaylist.$id,
-                    newName.trim()
-                  );
-                  await loadPlaylists();
-  
-                  setRenameModal(false);
-                  setOptionsModal(false);
-                  setSelectedPlaylist(null);
-                  setNewName("");
-                  Toast.show({
-                    type: "success",
-                    text1: "Playlist renamed",
-                  });
-                }catch(error) {
-                  Toast.show({
-                    type: "error",
-                    text1: "Couldn't rename playlist",
-                  });
-                  console.error(error);
-                } finally {
-                  setPlaylistAction(null);
-                }
-              }}
+              onPress={handleRenamePlaylist}
               disabled={!newName.trim() || busy}
               className={`w-full rounded-full items-center justify-center ${
                 newName.trim() ? "bg-primary-300" : "bg-gray-600"
@@ -595,10 +602,21 @@ const ArtistsRoute = () => {
 
   const router = useRouter();
 
-  const {likedArtists, artistImages, loadArtistImage } = useGlobalContext();
+  const {likedArtists, artistImages, loadArtistImage } = useLikes();
+  const [failedImages, setFailedImages] = React.useState<Record<string, boolean>>({});
+
+  const handleArtistImageError = React.useCallback((artist: string) => {
+    setFailedImages(prev => ({
+        ...prev,
+        [artist]: true,
+    }));
+  }, []);
 
   React.useEffect(() => {
-    likedArtists.forEach(loadArtistImage);
+    const load = async () => {
+      await Promise.all(likedArtists.map(loadArtistImage));
+    };
+    load();
   }, [likedArtists, loadArtistImage])
 
   if (likedArtists.length === 0) {
@@ -620,9 +638,9 @@ const ArtistsRoute = () => {
           paddingBottom: 100,
         }}
       >
-        {likedArtists.map((artist, index) => (
+        {likedArtists.map((artist) => (
           <TouchableOpacity
-            key={index}
+            key={artist}
             onPress={() =>
               router.push({
                 pathname: "/(root)/(tabs)/favourites/listScreen",
@@ -639,13 +657,18 @@ const ArtistsRoute = () => {
           >
             <View className="h-16 w-16 rounded-full bg-[#ffffff20] items-center justify-center border-2 border-text2 p-[2px]">
               <Image
-                source={artistImages[artist] ? {
-                  uri: artistImages[artist],
-                  cache: "force-cache"
-                  } : images.artist
-                }
-                tintColor={artistImages[artist] ? undefined : "white"}
-                className="h-full w-full rounded-full"
+                  source={
+                      failedImages[artist]
+                          ? images.artist
+                          : artistImages[artist]
+                              ? {
+                                  uri: artistImages[artist],
+                                  cache: "force-cache",
+                              }
+                              : images.artist
+                  }
+                  onError={() => handleArtistImageError(artist)}
+                  className="h-full w-full rounded-full"
               />
             </View>
 
@@ -670,21 +693,47 @@ export default function Favourites() {
   const layout = useWindowDimensions();
   const [index, setIndex] = React.useState(0);
 
-  const [routes] = React.useState<Route[]>([
+  const routes = React.useMemo(() => ([
     { key: "playlists", title: "Playlists" },
     { key: "artists", title: "Artists" },
-  ]);
+  ]), []);
 
-  const renderScene = ({route} : {route: Route}) =>  {
-    switch(route.key) {
-      case "playlists":
-        return <PlaylistsRoute/>;
-      case "artists":
-        return <ArtistsRoute/>;
-        default:
-          return null;
+  const renderScene = React.useCallback(
+    ({route} : {route: Route}) =>  {
+      switch(route.key) {
+        case "playlists":
+          return <PlaylistsRoute/>;
+        case "artists":
+          return <ArtistsRoute/>;
+          default:
+            return null;
     }
-  };
+  }, []);
+
+  const renderTabBar = React.useCallback(
+    (props : any) => (
+        <TabBar
+          {...props}
+          style={{backgroundColor:'#000000'}}
+          indicatorStyle={{backgroundColor:'white'}}
+          tabStyle={{width: layout.width / routes.length}}
+          labelStyle={{
+            fontFamily: "Poppins-Medium",
+            fontSize: 15,
+            textTransform: "none",
+          }}
+          contentContainerStyle={{flex:1, justifyContent:'space-between'}}
+          renderLabel={({route, focused} : {route: Route; focused: boolean}) => (
+            <Text style={{
+              fontFamily: "Poppins-Medium",
+              fontSize: 15,  
+              color: focused ? "white" : "#6f7684"}}
+            >
+              {route.title} 
+            </Text>
+          )}
+        />
+      ), [layout.width, routes.length]);
 
   return (
     <TabView
@@ -692,21 +741,7 @@ export default function Favourites() {
       renderScene={renderScene}
       onIndexChange={setIndex}
       initialLayout={{width: layout.width}}  
-      renderTabBar={(props) => (
-        <TabBar
-          {...(props as any)}
-          style={{backgroundColor:'#000000'}}
-          indicatorStyle={{backgroundColor:'white'}}
-          tabStyle={{width: layout.width / routes.length}}
-          contentContainerStyle={{flex:1, justifyContent:'space-between'}}
-          renderLabel={({route, focused} : {route: Route; focused: boolean}) => (
-            <Text className="font-poppins-medium" style={{color: focused ? "white" : "#6f7684"}}>
-              {route.title} 
-            </Text>
-          )}
-        />
-      )} 
+      renderTabBar={renderTabBar} 
     />
-
   );
 }

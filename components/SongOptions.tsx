@@ -1,4 +1,3 @@
-import { getArtistImage } from "@/lib/api/musicApis";
 import {
   addEditorsPick,
   deleteEditorsPick,
@@ -7,7 +6,7 @@ import {
 } from "@/lib/appwrite";
 
 import { ADMIN_ID } from "@/lib/config";
-import { useGlobalContext } from "@/lib/global-provider";
+import { useAuth, useLikes, usePlaylists } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
 
@@ -30,24 +29,26 @@ type SongAction = "playlist" | "editorsPick" | null;
 export default function SongOptions({
   song,
   onClose,
+  showGoToArtist = true,
+  showPlayNext = true,
+  showShare = true
 }: Props) {
 
-  const {
-    user,
-    likedSongs,
-    playlists,
-    loadPlaylists,
-    handleToggleLike,
-  } = useGlobalContext();
+  const {user} = useAuth();
 
+  const {likedSongs, handleToggleLike, loadArtistImage} = useLikes();
+
+  const {playlists, loadPlaylists} = usePlaylists();
 
   const {currentTrack, addToNextQueue, navigationContext} = usePlayer();
 
   const isAdmin = user?.$id === ADMIN_ID;
 
-  const isLiked = song ? likedSongs.includes(song.id) : false;
+  const isLiked = React.useMemo(() => (
+    song ? likedSongs.includes(song.id) : false
+  ), [song?.id, likedSongs]);
 
-  const canPlayNext = currentTrack && song?.id !== currentTrack.id;
+  const canPlayNext = currentTrack != null && song?.id !== currentTrack.id;
 
   const [editorsPickDocId, setEditorsPickDocId] =
     useState<string | null>(null);
@@ -224,41 +225,43 @@ export default function SongOptions({
       )}
 
       {/* GO TO ARTIST */}
-      <TouchableOpacity
-        className="py-2"
-        onPress={async () => {
+      { showGoToArtist && (
+        <TouchableOpacity
+          className="py-2"
+          onPress={async () => {
 
-          const firstArtist =
-            song.artists?.[0];
+            const firstArtist =
+              song.artists?.[0];
 
-          if (!firstArtist) return;
-        
-          let artistImage = await getArtistImage(firstArtist.name);
+            if (!firstArtist) return;
+          
+            let artistImage = await loadArtistImage(firstArtist.name);
 
-          if (!artistImage) {
-            artistImage = "https://global.honda/en/RandD/assets/img/member/member_ninomiya.jpg"
-          }
-        
-          router.push({
-            pathname: navigationContext.route,
-            params: {
-              type: "artist",
-              title: firstArtist.name,
-              artist: firstArtist.name,
-              image: artistImage || "",
-              source: navigationContext.source,
-            },
-          });
-          onClose();
-        }}
-      >
-        <Text className="text-white text-lg font-poppins-semibold">
-          Go to Artist
-        </Text>
-      </TouchableOpacity>
+            if (!artistImage) {
+              artistImage = "https://global.honda/en/RandD/assets/img/member/member_ninomiya.jpg"
+            }
+          
+            router.push({
+              pathname: navigationContext.route,
+              params: {
+                type: "artist",
+                title: firstArtist.name,
+                artist: firstArtist.name,
+                image: artistImage || "",
+                source: navigationContext.source,
+              },
+            });
+            onClose();
+          }}
+        >
+          <Text className="text-white text-lg font-poppins-semibold">
+            Go to Artist
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* PLAY NEXT */}
-      {canPlayNext && (
+      { showPlayNext && canPlayNext && (
         <TouchableOpacity
           className="py-2"
           onPress={async() => {
@@ -285,24 +288,26 @@ export default function SongOptions({
       )}
 
       {/* SHARE */}
-      <TouchableOpacity
-        className="py-2"
-        onPress={async () => {
+      {showShare && (
+        <TouchableOpacity
+          className="py-2"
+          onPress={async () => {
 
-          await Share.share({
-            message:
-              `${song.title} - ${song.artists?.map(
-                (a) => a.name
-              ).join(", ")}`,
-          });
+            await Share.share({
+              message:
+                `${song.title} - ${song.artists?.map(
+                  (a) => a.name
+                ).join(", ")}`,
+            });
 
-          onClose();
-        }}
-      >
-        <Text className="text-white text-lg font-poppins-semibold">
-          Share
-        </Text>
-      </TouchableOpacity>
+            onClose();
+          }}
+        >
+          <Text className="text-white text-lg font-poppins-semibold">
+            Share
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* CANCEL */}
       <TouchableOpacity

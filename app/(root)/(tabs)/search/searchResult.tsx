@@ -3,7 +3,7 @@ import images from "@/constants/images";
 import { incrementPlay } from "@/lib/api/musicApis";
 import { addEditorsPick, deleteEditorsPick, getEditorsPick } from "@/lib/appwrite";
 import { ADMIN_ID } from "@/lib/config";
-import { useGlobalContext } from "@/lib/global-provider";
+import { useAuth, useLikes } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,7 +20,7 @@ export default function SearchResult() {
         ? JSON.parse(result as string)
         : null;
 
-const songQueue: Song[] =
+  const songQueue: Song[] =
     queue
         ? JSON.parse(queue as string)
         : song
@@ -32,10 +32,11 @@ const songQueue: Song[] =
   const [bgColor, setBgColor] = useState("#000000");
   const [editorsPickDocId, setEditorsPickDocId] = useState<string | null>(null);
   const [loadingEditorsPick, setLoadingEditorsPick] = useState(false);
-  const {likedSongs, handleToggleLike, user} =useGlobalContext();
+  const { user } = useAuth();
+  const {likedSongs, handleToggleLike } = useLikes();
   const isAdmin = user?.$id === ADMIN_ID;
 
-  const {playQueue ,playTrack, togglePlayPause, currentTrack, isPlaying} = usePlayer();
+  const {playQueue, togglePlayPause, currentTrack, isPlaying} = usePlayer();
   const title = song?.title || "Unknown Title";
   const artist = song?.artists?.map((a) => a.name).join(", ") || "Unknown Artist";
   const thumbnail = song?.thumbnail_url;
@@ -85,7 +86,7 @@ const songQueue: Song[] =
     };
 
     checkEditorsPick();
-  }, [song?.id]);
+  }, [song?.id, isAdmin]);
 
   const isCurrentSong = currentTrack?.id === song?.id;
 

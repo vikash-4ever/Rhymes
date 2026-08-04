@@ -2,7 +2,7 @@ import icons from "@/constants/icons";
 import images from "@/constants/images";
 import { account, config, databases, ID } from "@/lib/appwrite";
 import { loginWithGoogle } from "@/lib/auth";
-import { useGlobalContext } from "@/lib/global-provider";
+import { useAuth } from "@/lib/global-provider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -19,7 +19,7 @@ const slides = [
 export default function SignIN() {
   const [index, setIndex] = useState(0);
   const translateX = useRef(new Animated.Value(0)).current;
-  const { user, refreshUser, loginAsGuest } = useGlobalContext();
+  const { refreshUser, loginAsGuest } = useAuth();
 
   // Slide animation
   useEffect(() => {
@@ -43,7 +43,7 @@ export default function SignIN() {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [translateX]);
 
   const currentSlide = slides[index];
 

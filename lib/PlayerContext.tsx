@@ -1,8 +1,8 @@
 import { Song } from "@/types/song";
-import TrackPlayer, { PlaybackState, RepeatMode, useActiveMediaItem, useIsPlaying, usePlaybackState } from "@rntp/player";
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import TrackPlayer, { PlaybackState, PlayerCommand, RepeatMode, useActiveMediaItem, useIsPlaying, usePlaybackState } from "@rntp/player";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import ImageColors from "react-native-image-colors";
-import { useGlobalContext } from "./global-provider";
+import { useAuth, useRecent } from "./global-provider";
 import { songToMediaItem } from "./player/songToMediaPlayer";
 
 export type QueueContext = {
@@ -59,15 +59,14 @@ type PlayerContextType = {
   setQueueContext: React.Dispatch<React.SetStateAction<QueueContext>>;
   setNavigationContext: React.Dispatch<React.SetStateAction<NavigationContext>>;
 
-  playNext: () => Promise<void>;
-  playPrevious: () => Promise<void>;
+  playNext: () => void;
+  playPrevious: () => void;
+  togglePlayPause: () => void;
+  seekTo: (seconds: number) => void;
+  stopTrack: () => void;
+  resetPlayer: () => void;
 
   addToNextQueue: (song: Song) => Promise<void>;
-
-  togglePlayPause: () => Promise<void>;
-  stopTrack: () => Promise<void>;
-  resetPlayer: () => Promise<void>;
-  seekTo: (seconds: number) => Promise<void>;
   playShuffledQueue: (songs: Song[], queueContext?: QueueContext) => Promise<void>;
 
   toggleShuffle: () => Promise<void>;
@@ -78,10 +77,27 @@ const PlayerContext = createContext<PlayerContextType | null>(null);
 
 const colorCache = new Map<string, string>();
 
+// Shuffle function for playlists
+const shuffleArray = (array: Song[]) => {
+  const shuffled = [...array];
+
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+
+    [shuffled[i], shuffled[j]] = [
+      shuffled[j],
+      shuffled[i],
+    ];
+  }
+
+  return shuffled;
+};
 
 export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
   
-  const {user, recentlyPlayed, setRecentlyPlayed } = useGlobalContext();
+  const {user} = useAuth();
+  const {setRecentlyPlayed } = useRecent();
+  
   
   useEffect(() => {
     const initializeTrackPlayer = async () => {
@@ -89,7 +105,31 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
         await TrackPlayer.setupPlayer({
           contentType: "music",
           handleAudioBecomingNoisy: true,
+          android: {
+            notification: {
+              channelId: "com.vikash_4ever.rhymes.playback",
+              channelName: "Music Playback",
+              smallIcon: "ic_notification",
+            },
+          },
+          cache: {
+            maxSizeBytes: 500 * 1024 * 1024,
+
+            preloading: {
+              window: 1,
+            },
+          },
         });
+
+        TrackPlayer.setCommands({
+          capabilities: [
+            PlayerCommand.PlayPause,
+            PlayerCommand.Next,
+            PlayerCommand.Previous,
+            PlayerCommand.Seek,
+            PlayerCommand.Stop
+          ]
+        })
 
       } catch (error) {
         console.error("❌ TrackPlayer setup failed:", error);
@@ -100,21 +140,23 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    const mode = TrackPlayer.getRepeatMode();
+    const loadRepeatMode = async () => {
+      const mode = await TrackPlayer.getRepeatMode();
 
-    switch (mode) {
-      case RepeatMode.Off:
-        setRepeatMode("off");
-        break;
+      switch (mode) {
+        case RepeatMode.Off:
+          setRepeatMode("off");
+          break;
+        case RepeatMode.One:
+          setRepeatMode("one");
+          break;
+        case RepeatMode.All:
+          setRepeatMode("all");
+          break;
+      }
+    };
 
-      case RepeatMode.One:
-        setRepeatMode("one");
-        break;
-
-      case RepeatMode.All:
-        setRepeatMode("all");
-        break;
-    }
+    loadRepeatMode();
   }, []);
 
   const activeMediaItem = useActiveMediaItem();
@@ -150,14 +192,6 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
         setCurrentIndex(index);
     }
   }, [activeMediaItem]);
-
-  
-  useEffect(() => {
-    if (!user) {
-      resetPlayer();
-    }
-  }, [user]);
-
 
   const [currentTrack, setCurrentTrack] = useState<Song | null>(null);
 
@@ -254,369 +288,399 @@ export const PlayerProvider = ({ children }: { children: React.ReactNode }) => {
   // Recently Played
   // -------------------------
 
-  const addToRecentlyPlayed = (track: Song) => {
-    const updated = [
-      track,
-      ...recentlyPlayed.filter((t) => t.id !== track.id),
-    ].slice(0, 10);
-
-    setRecentlyPlayed(updated);
-  };
+  const addToRecentlyPlayed = useCallback ((track: Song) => {
+    setRecentlyPlayed(prev => {
+      return [
+        track,
+        ...prev.filter((t) => t.id !== track.id),
+      ].slice(0, 10);
+    });  
+    }, [setRecentlyPlayed]); 
 
   // -------------------------
   // PLAY TRACK
   // -------------------------
 
-  const playTrack = async (track: Song) => {
-    try {
-      setPendingTrack(track);
-      setQueue([track]);
-      queueRef.current = [track];
-      originalQueueRef.current = [track];
-      setIsShuffle(false);
-      setCurrentIndex(0);
-      addToRecentlyPlayed(track);
-      await TrackPlayer.setMediaItem(songToMediaItem(track));
-      await TrackPlayer.play();
-
-    } catch (err) {
-      console.warn("playTrack error:", err);
-    }
-  };
-
-  const playQueue = async (songs: Song[], startIndex: number, queueContext?: QueueContext) => {
-    try{
-      const track = songs?.[startIndex];
-      if (!track) {
-        console.warn("playqueue : invalid track/index",{
-          startIndex,
-          songsLength: songs?.length,
-        })
-        return;
+  const playTrack = useCallback(
+    async (track: Song) => {
+      try {
+        setPendingTrack(track);
+        setQueue([track]);
+        queueRef.current = [track];
+        originalQueueRef.current = [track];
+        setIsShuffle(false);
+        setCurrentIndex(0);
+        addToRecentlyPlayed(track);
+        await TrackPlayer.setMediaItem(songToMediaItem(track));
+        TrackPlayer.play();
+  
+      } catch (err) {
+        setPendingTrack(null);
+        console.warn("playTrack error:", err);
       }
-      setPendingTrack(track);
-      setQueue(songs);
-      if(queueContext) {
-        setQueueContext(queueContext);
+    }, [addToRecentlyPlayed]); 
+
+  const playQueue = useCallback(
+    async (songs: Song[], startIndex: number, queueContext?: QueueContext) => {
+      try{
+        const track = songs?.[startIndex];
+        if (!track) {
+          console.warn("playqueue : invalid track/index",{
+            startIndex,
+            songsLength: songs?.length,
+          })
+          return;
+        }
+        setPendingTrack(track);
+        setQueue(songs);
+        if(queueContext) {
+          setQueueContext(queueContext);
+        }
+        queueRef.current = songs;
+        originalQueueRef.current = songs;
+  
+        const mediaItems = songs.map(songToMediaItem);
+        await TrackPlayer.setMediaItems(mediaItems, startIndex);
+        TrackPlayer.play();
+  
+        setIsShuffle(false);
+        setCurrentIndex(startIndex);
+        addToRecentlyPlayed(track);
+      } catch (error){
+        setPendingTrack(null);
+        console.warn("playQueue error!", error);
       }
-      queueRef.current = songs;
-      originalQueueRef.current = songs;
+    }, [addToRecentlyPlayed]); 
 
-      const mediaItems = songs.map(songToMediaItem);
-      await TrackPlayer.setMediaItems(mediaItems, startIndex);
-      await TrackPlayer.play();
+  const playNext = useCallback(() => {
+      TrackPlayer.skipToNext();
+    }, []); 
 
-      setIsShuffle(false);
-      setCurrentIndex(startIndex);
-      addToRecentlyPlayed(track);
-    } catch (error){
-      console.warn("playQueue error!", error);
-    }
-  }
-
-  const playNext = async () => {
-    await TrackPlayer.skipToNext();
-  };
-
-  const playPrevious = async () => {
-    await TrackPlayer.skipToPrevious();
-  };
+  const playPrevious = useCallback(() => {
+      TrackPlayer.skipToPrevious();
+    }, []); 
 
 
   // -------------------------
   // CONTROLS
   // -------------------------
 
-  const togglePlayPause = async () => {
-
-    if (isPlaying) {
-      await TrackPlayer.pause();
-    }else {
-      await TrackPlayer.play();
-    }
-  };
+  const togglePlayPause = useCallback(() => {
   
-  const seekTo = async (seconds: number) => {
-    try {
-      await TrackPlayer.seekTo(seconds);
-    } catch {}
-  };
-
-  const toggleRepeatMode = async () => {
-    let nextMode: "off" | "one" | "all";
-
-    switch (repeatMode) {
-        case "off":
-            nextMode = "one";
-            break;
-
-        case "one":
-            nextMode = "all";
-            break;
-
-        default:
-            nextMode = "off";
-    }
-
-    
-    switch (nextMode) {
-      case "off":
-        await TrackPlayer.setRepeatMode(RepeatMode.Off);
-        break;
-        
-      case "one":
-        await TrackPlayer.setRepeatMode(RepeatMode.One);
-        break;
-          
-       case "all":
-        await TrackPlayer.setRepeatMode(RepeatMode.All);
-        break;
-    }
-    setRepeatMode(nextMode);
-    console.log(
-      "Repeat:",
-      TrackPlayer.getRepeatMode()
-    );
-  };
-
-  const stopTrack = async () => {
-    try {
-      await TrackPlayer.seekTo(0);
-    } catch {}
-  };
-
-  // Shuffle function for playlists
-  const shuffleArray = (array: Song[]) => {
-    const shuffled = [...array];
-
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-
-      [shuffled[i], shuffled[j]] = [
-        shuffled[j],
-        shuffled[i],
-      ];
-    }
-
-    return shuffled;
-  };
-
-  const toggleShuffle = async () => {
-    if (!currentTrack) return;
-
-    const reorderQueue = async (targetQueue: Song[]) => {
-      const currentQueue = [...queueRef.current];
-      for (let targetIndex = 0; targetIndex < targetQueue.length; targetIndex++) {
-        const targetSong = targetQueue[targetIndex];
-
-        const currentIndex = currentQueue.findIndex(
-          song => song.id === targetSong.id
-        );
-
-        if (currentIndex === -1) continue;
-
-        if (currentIndex === targetIndex) continue;
-        
-        await TrackPlayer.moveMediaItem(
-          currentIndex,
-          targetIndex
-        );
-
-        // Keep our local copy in sync
-        const [movedSong] = currentQueue.splice(currentIndex, 1);
-
-        currentQueue.splice(
-          targetIndex,
-          0,
-          movedSong
-        );
+      if (isPlaying) {
+        TrackPlayer.pause();
+      }else {
+        TrackPlayer.play();
       }
-    };
+    }, [isPlaying]); 
+  
+  const seekTo = useCallback((seconds: number) => {
+      try {
+        TrackPlayer.seekTo(seconds);
+      } catch {}
+    }, []); 
 
-    if (!isShuffle) {
-      // Enable shuffle
+  const toggleRepeatMode = useCallback(
+    async () => {
+      let nextMode: "off" | "one" | "all";
+  
+      switch (repeatMode) {
+          case "off":
+              nextMode = "one";
+              break;
+  
+          case "one":
+              nextMode = "all";
+              break;
+  
+          default:
+              nextMode = "off";
+      }
+  
+      
+      switch (nextMode) {
+        case "off":
+          TrackPlayer.setRepeatMode(RepeatMode.Off);
+          break;
+          
+        case "one":
+          TrackPlayer.setRepeatMode(RepeatMode.One);
+          break;
+            
+         case "all":
+          TrackPlayer.setRepeatMode(RepeatMode.All);
+          break;
+      }
+      setRepeatMode(nextMode);
+      console.log("Repeat:", nextMode);
+    }, [repeatMode]); 
 
-      const currentQueue = queueRef.current;
+  const stopTrack = useCallback(() => {
+      try {
+        TrackPlayer.seekTo(0);
+      } catch {}
+    }, []); 
 
-      const current = currentIndex;
-
-      if (current < 0) return;
-
-      const before = currentQueue.slice(0, current + 1);
-
-      const after = shuffleArray(currentQueue.slice(current + 1));
-
-      const shuffledQueue = [
-        ...before,
-        ...after,
-      ];
-
-      await reorderQueue(shuffledQueue);
-
-      setQueue(shuffledQueue);
-      setCurrentIndex(current);
-      setIsShuffle(true);
-
-    } else {
-        // Disable shuffle
-      const index =
-        originalQueueRef.current.findIndex(
-          song => song.id === currentTrack.id
-        );
-
-      if (index < 0) return;
-
-      await reorderQueue(originalQueueRef.current);
-
-      setQueue(originalQueueRef.current);
-      setCurrentIndex(index);
-      setIsShuffle(false);
-    }
-  };
+  const toggleShuffle = useCallback(
+    async () => {
+      if (!currentTrack) return;
+  
+      const reorderQueue = async (targetQueue: Song[]) => {
+        const currentQueue = [...queueRef.current];
+        for (let targetIndex = 0; targetIndex < targetQueue.length; targetIndex++) {
+          const targetSong = targetQueue[targetIndex];
+  
+          const currentIndex = currentQueue.findIndex(
+            song => song.id === targetSong.id
+          );
+  
+          if (currentIndex === -1) continue;
+  
+          if (currentIndex === targetIndex) continue;
+          
+          await TrackPlayer.moveMediaItem(
+            currentIndex,
+            targetIndex
+          );
+  
+          // Keep our local copy in sync
+          const [movedSong] = currentQueue.splice(currentIndex, 1);
+  
+          currentQueue.splice(
+            targetIndex,
+            0,
+            movedSong
+          );
+        }
+      };
+  
+      if (!isShuffle) {
+        // Enable shuffle
+  
+        const currentQueue = queueRef.current;
+  
+        const current = currentIndex;
+  
+        if (current < 0) return;
+  
+        const before = currentQueue.slice(0, current + 1);
+  
+        const after = shuffleArray(currentQueue.slice(current + 1));
+  
+        const shuffledQueue = [
+          ...before,
+          ...after,
+        ];
+  
+        await reorderQueue(shuffledQueue);
+  
+        setQueue(shuffledQueue);
+        setCurrentIndex(current);
+        setIsShuffle(true);
+  
+      } else {
+          // Disable shuffle
+        const index =
+          originalQueueRef.current.findIndex(
+            song => song.id === currentTrack.id
+          );
+  
+        if (index < 0) return;
+  
+        await reorderQueue(originalQueueRef.current);
+  
+        setQueue(originalQueueRef.current);
+        setCurrentIndex(index);
+        setIsShuffle(false);
+      }
+    }, [currentTrack, currentIndex, isShuffle]); 
 
   // Shuffle Queue for playlists
-  const playShuffledQueue = async (songs: Song[], queueContext?: QueueContext) => {
-    try {
-      const shuffled = shuffleArray(songs);
-
-      if (!shuffled[0]) return;
-      const mediaItems = shuffled.map(songToMediaItem);
-
-      await TrackPlayer.setMediaItems(mediaItems, 0);
-      await TrackPlayer.play();
-
-      setQueue(shuffled);
-      setIsShuffle(true);
-      if(queueContext) {
-        setQueueContext(queueContext);
+  const playShuffledQueue = useCallback(
+    async (songs: Song[], queueContext?: QueueContext) => {
+      try {
+        const shuffled = shuffleArray(songs);
+  
+        if (!shuffled[0]) return;
+        const mediaItems = shuffled.map(songToMediaItem);
+  
+        await TrackPlayer.setMediaItems(mediaItems, 0);
+        TrackPlayer.play();
+  
+        setQueue(shuffled);
+        setIsShuffle(true);
+        if(queueContext) {
+          setQueueContext(queueContext);
+        }
+        originalQueueRef.current = songs;
+        setCurrentIndex(0);
+        addToRecentlyPlayed(shuffled[0]);
+      } catch (error) {
+        setPendingTrack(null);
+        console.warn("playShuffledQueue error!", error);
       }
-      originalQueueRef.current = songs;
-      setCurrentIndex(0);
-      addToRecentlyPlayed(shuffled[0]);
-    } catch (error) {
-      console.warn("playShuffledQueue error!", error);
-    }
-  };
+    }, [addToRecentlyPlayed]); 
 
-  const resetPlayer = async () => {
-    try {
-      await TrackPlayer.stop();
-      setCurrentTrack(null);
-      setPendingTrack(null);
-      setDominantColor("#000000");
-      setQueue([]);
-      setIsShuffle(false);
-      originalQueueRef.current = [];
-      setCurrentIndex(0);
-    } catch (error) {
-      console.warn("resetPlayer error:", error);
-    }
-  };
+  const resetPlayer = useCallback(() => {
+      try {
+        TrackPlayer.stop();
+        setCurrentTrack(null);
+        setPendingTrack(null);
+        setDominantColor("#000000");
+        setQueue([]);
+        setIsShuffle(false);
+        originalQueueRef.current = [];
+        setCurrentIndex(0);
+        queueRef.current = [];
+        setQueueContext({
+            type: "recent",
+            title: "Recent",
+            route: "/(root)/(tabs)/home/listScreen",
+        });
+        setNavigationContext({
+            route: "/(root)/(tabs)/home/listScreen",
+            source: "home",
+        });
+      } catch (error) {
+        console.warn("resetPlayer error:", error);
+      }
+    }, []); 
 
-  const addToNextQueue = async (song: Song) => {
-    if (!currentTrack) {
-      await playTrack(song);
-      return;
-    }
+  const addToNextQueue = useCallback(
+    async (song: Song) => {
+      if (!currentTrack) {
+        await playTrack(song);
+        return;
+      }
 
-    // Current song doesn't need "Play Next"
-    if (song.id === currentTrack.id) {
-      return;
-    }
+      // Current song doesn't need "Play Next"
+      if (song.id === currentTrack.id) {
+        return;
+      }
 
-    const currentQueue = [...queueRef.current];
+      const currentQueue = [...queueRef.current];
 
-    const currentTrackIndex = currentQueue.findIndex(
-      (s) => s.id === currentTrack.id
-    );
-
-    if (currentTrackIndex === -1) return;
-
-    const existingIndex = currentQueue.findIndex(
-      (s) => s.id === song.id
-    );
-
-    // Already next
-    if (existingIndex === currentTrackIndex + 1) {
-      return;
-    }
-
-    if (existingIndex >= 0) {
-      // Song already exists -> move it
-      await TrackPlayer.moveMediaItem(
-        existingIndex,
-        currentTrackIndex + 1
+      const currentTrackIndex = currentQueue.findIndex(
+        (s) => s.id === currentTrack.id
       );
 
-      const [movedSong] = currentQueue.splice(existingIndex, 1);
+      if (currentTrackIndex === -1) return;
 
-      // If song was before current song,
-      // removing it shifts current index left by one.
-      const insertIndex =
-        existingIndex < currentTrackIndex
-          ? currentTrackIndex
-          : currentTrackIndex + 1;
-
-      currentQueue.splice(insertIndex, 0, movedSong);
-
-    } else {
-      // Song not in queue -> insert it
-      await TrackPlayer.insertMediaItem(
-        currentTrackIndex + 1,
-        songToMediaItem(song)
+      const existingIndex = currentQueue.findIndex(
+        (s) => s.id === song.id
       );
 
-      currentQueue.splice(
-        currentTrackIndex + 1,
-        0,
-        song
+      // Already next
+      if (existingIndex === currentTrackIndex + 1) {
+        return;
+      }
+
+      if (existingIndex >= 0) {
+        // Song already exists -> move it
+        await TrackPlayer.moveMediaItem(
+          existingIndex,
+          currentTrackIndex + 1
+        );
+
+        const [movedSong] = currentQueue.splice(existingIndex, 1);
+
+        // If song was before current song,
+        // removing it shifts current index left by one.
+        const insertIndex =
+          existingIndex < currentTrackIndex
+            ? currentTrackIndex
+            : currentTrackIndex + 1;
+
+        currentQueue.splice(insertIndex, 0, movedSong);
+
+      } else {
+        // Song not in queue -> insert it
+        await TrackPlayer.insertMediaItem(
+          currentTrackIndex + 1,
+          songToMediaItem(song)
+        );
+
+        currentQueue.splice(
+          currentTrackIndex + 1,
+          0,
+          song
+        );
+      }
+
+      queueRef.current = currentQueue;
+      setQueue(currentQueue);
+
+      const updatedCurrentIndex = currentQueue.findIndex(
+        s => s.id === currentTrack.id
       );
+
+      if (updatedCurrentIndex !== currentIndex) {
+        setCurrentIndex(updatedCurrentIndex);
+      }
+    }, [currentTrack, currentIndex, playTrack]); 
+
+  useEffect(() => {
+    if (!user) {
+      resetPlayer();
     }
+  }, [user, resetPlayer]);
 
-    queueRef.current = currentQueue;
-    setQueue(currentQueue);
+  const value = useMemo(() => ({
+      currentTrack,
+      dominantColor,
+      isPlaying,
+      isShuffle,
+      repeatMode,
+      isPreparing,
+      queueContext,
 
-    const updatedCurrentIndex = currentQueue.findIndex(
-      s => s.id === currentTrack.id
-    );
+      playTrack,
+      playQueue,
+      playNext,
+      playPrevious,
+      pendingTrack,
+      addToNextQueue,
 
-    if (updatedCurrentIndex !== currentIndex) {
-      setCurrentIndex(updatedCurrentIndex);
-    }
-  };
+      togglePlayPause,
+      stopTrack,
+      resetPlayer,
+      seekTo,
+      playShuffledQueue,
+      toggleShuffle,
+      toggleRepeatMode,
+
+      setPendingTrack,
+      setQueueContext,
+
+      navigationContext,
+      setNavigationContext,
+  }), [
+      currentTrack,
+      dominantColor,
+      isPlaying,
+      isShuffle,
+      repeatMode,
+      isPreparing,
+      queueContext,
+      pendingTrack,
+      navigationContext,
+
+      playTrack,
+      playQueue,
+      playNext,
+      playPrevious,
+      addToNextQueue,
+      togglePlayPause,
+      stopTrack,
+      resetPlayer,
+      seekTo,
+      playShuffledQueue,
+      toggleShuffle,
+      toggleRepeatMode,
+  ]);
 
   return (
-    <PlayerContext.Provider
-      value={{
-        currentTrack,
-        dominantColor,
-        isPlaying,
-        isShuffle,
-        repeatMode,
-        isPreparing,
-        queueContext,
-
-        playTrack,
-        playQueue,
-
-        playNext,
-        playPrevious,
-        pendingTrack,
-        addToNextQueue,
-        
-        togglePlayPause,
-        stopTrack,
-        resetPlayer,
-        seekTo,
-        playShuffledQueue,
-        toggleShuffle,
-        toggleRepeatMode,
-        setPendingTrack,
-        setQueueContext,
-        navigationContext,
-        setNavigationContext
-      }}
-    >
+    <PlayerContext.Provider value={value}>
       {children}
     </PlayerContext.Provider>
   );

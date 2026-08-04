@@ -3,13 +3,13 @@ import SongOptions from "@/components/SongOptions";
 import icons from "@/constants/icons";
 import images from "@/constants/images";
 import { getSongsByArtist, getSongsByCategory, getSongsByIds } from "@/lib/api/musicApis";
-import { useGlobalContext } from "@/lib/global-provider";
+import { useAuth, useLikes, usePlaylists } from "@/lib/global-provider";
 import { QueueContext, usePlayer } from "@/lib/PlayerContext";
 import { Song } from "@/types/song";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Animated,
@@ -21,20 +21,19 @@ import {
 } from "react-native";
 import ImageColors from "react-native-image-colors";
 
+const optimizeImage =(url: string) => {
+    return url.replace(/\d+x\d+/, "256x256");
+};
+
 export default function SongsList() {
 
-    const { playQueue, setNavigationContext, playShuffledQueue } = usePlayer();
+    const { setNavigationContext, playShuffledQueue } = usePlayer();
 
     const { type, id, title, artist, image, category, color, source } = useLocalSearchParams();
 
-    const {
-        user,
-        likedSongs,
-        playlists,
-        likedArtists,
-        handleToggleArtist
-    } = useGlobalContext();
-
+    const { user } = useAuth();
+    const { likedSongs, handleToggleArtist, likedArtists } = useLikes();
+    const { playlists } = usePlaylists();
     const [songs, setSongs] = useState<Song[]>([]);
     const [songsLoading, setSongsLoading] = useState(false);
 
@@ -75,12 +74,13 @@ export default function SongsList() {
         [playlists, id]
     );
 
-    const currentRoute: QueueContext["route"] =
-    source === "search"
-        ? "/(root)/(tabs)/search/listScreen"
-        : source === "favourites"
-        ? "/(root)/(tabs)/favourites/listScreen"
-        : "/(root)/(tabs)/home/listScreen";
+    const currentRoute = useMemo<QueueContext["route"]>(() => {
+        return source === "search"
+            ? "/(root)/(tabs)/search/listScreen"
+            : source === "favourites"
+            ? "/(root)/(tabs)/favourites/listScreen"
+            : "/(root)/(tabs)/home/listScreen"
+    }, [source]);
 
 
     useEffect(() => {
@@ -88,7 +88,7 @@ export default function SongsList() {
             route: currentRoute,
             source: source as "home" | "search" | "favourites",
         });
-    }, [currentRoute, source]);
+    }, [currentRoute, source, setNavigationContext]);
 
     const currentQueueContext = React.useMemo<QueueContext>(() => {
         switch (type) {
@@ -179,9 +179,6 @@ export default function SongsList() {
         "#000000"
     ]);
 
-    const optimizeImage = (url: string) => {
-        return url.replace(/\d+x\d+/, "256x256");
-    };
 
     const imageUri = React.useMemo(() => {
 
@@ -197,9 +194,10 @@ export default function SongsList() {
 
     }, [image]);
 
-    const isArtistLiked =
+    const isArtistLiked = useMemo(() => (
         type === "artist" &&
-        likedArtists.includes(artist as string);
+        likedArtists.includes(artist as string)
+    ), [type, artist, likedArtists]);
 
     const finalImageUri = imageUri;
 

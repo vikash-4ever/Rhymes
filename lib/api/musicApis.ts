@@ -53,11 +53,42 @@ export const incrementPlay = async (songId: string) => {
 
 /* ---------------- DISCOVERY ---------------- */    //_________________APPLIED______________
 
+export const getRecommendations = async ({
+  likedSongIds,
+  recentSongIds,
+  likedArtists,
+  limit = 20,
+}: {
+  likedSongIds: string[];
+  recentSongIds: string[];
+  likedArtists: string[];
+  limit?: number;
+}) => {
+  const res = await fetch(`${API_BASE}/recommendations`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      likedSongIds,
+      recentSongIds,
+      likedArtists,
+      limit,
+    }),
+  });
+
+  const data = await res.json();
+
+  return data;
+
+
+};
+
 export const getTrendingSongs = async (limit = 20) => {
   const res = await fetch(`${API_BASE}/trending?limit=${limit}`);
   return res.json();
 };
-                                                      //_________________APPLIED______________
+//_________________APPLIED______________
 export const getRecentSongs = async (limit = 20) => {
   const res = await fetch(`${API_BASE}/recent?limit=${limit}`);
   return res.json();

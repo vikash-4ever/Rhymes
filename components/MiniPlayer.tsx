@@ -1,9 +1,9 @@
 import icons from "@/constants/icons";
-import { useGlobalContext } from "@/lib/global-provider";
+import { useLikes } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { useProgress } from "@rntp/player";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -33,19 +33,26 @@ export default function MiniPlayer() {
   const [textWidth, setTextWidth] = useState(0);
   const scrollAnim = useRef(new Animated.Value(0)).current;
 
+  const textToScroll = useMemo(() => {
   const title = currentTrack.title || "Unknown Audio";
-  const artist = currentTrack.artists?.map((a) => a.name).join(", ") || "Unknown Artist";
-  const textToScroll = `${title}  •  ${artist}`;
+  const artist = currentTrack.artists?.map(a => a.name).join(", ") || "Unknown Artist";
+    return `${title}  •  ${artist}`;
+  }, [currentTrack]);
 
-  const {likedSongs, handleToggleLike} = useGlobalContext();
+  const {likedSongs, handleToggleLike} = useLikes();
 
-  const isLiked = currentTrack ? likedSongs.includes(currentTrack.id) : false;
+  const isLiked = useMemo(() => (
+    currentTrack 
+    ? likedSongs.includes(currentTrack.id) 
+    : false
+  ), [currentTrack?.id, likedSongs]);
 
-  const handleLikePress = async () => {
-    if(!currentTrack) return;
-
-    await handleToggleLike(currentTrack.id);
-  };
+  const handleLikePress = useCallback(
+    async () => {
+      if(!currentTrack) return;
+  
+      await handleToggleLike(currentTrack.id);
+    }, [currentTrack, handleToggleLike]); 
 
   useEffect(() => {
     if (textWidth > containerWidth && containerWidth > 0) {
@@ -73,22 +80,28 @@ export default function MiniPlayer() {
     } else {
       scrollAnim.setValue(0);
     }
-  }, [title, artist, textWidth, containerWidth]);
+  }, [textToScroll, textWidth, containerWidth, scrollAnim]);
 
   // --- PROGRESS BAR ---
-  const safeDuration = duration > 0 ? duration : 1;
+  const progressPercentage = useMemo(() => {
+    const safeDuration = duration > 0 ? duration : 1;
 
-  const progressPercentage = Math.min(
-    100,
-    Math.max(0, (position / safeDuration) * 100)
-  );
+    return Math.min(
+      100,
+      Math.max(0, (position / safeDuration) * 100)
+    );
+  }, [position, duration]);
 
   const shouldShowLoader = isPreparing;
+
+  const openPlayer = useCallback(() => {
+    router.push("/(root)/playingScreen");
+  }, []);
 
   return (
     <TouchableOpacity
       className="bg-primary-300 h-14 border-b border-black"
-      onPress={() => router.push("/(root)/playingScreen")}
+      onPress={openPlayer}
       activeOpacity={0.8}
     >
       {/* Progress bar */}

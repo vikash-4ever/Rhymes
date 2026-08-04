@@ -1,19 +1,12 @@
 import icons from "@/constants/icons";
-import { useGlobalContext } from "@/lib/global-provider";
+import { useAuth } from "@/lib/global-provider";
 import { usePlayer } from "@/lib/PlayerContext";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, Image, Linking, Modal, Text, TouchableOpacity, View } from "react-native";
 
-type AppUser = {
-    email?: string;
-    name?: string;
-    isGuest?: boolean;
-} | null;
-
 export default function SettingsScreen() {
-    const {user, logout} = useGlobalContext();
-    const appUser = user as unknown as AppUser;
+    const {user, logout} = useAuth();
     const [showModal, setShowModal] = useState(false);
     const {resetPlayer} = usePlayer();
 
@@ -64,7 +57,7 @@ export default function SettingsScreen() {
                     Account
                 </Text>
                 <Text className="text-sm font-poppins-light text-gray-400">
-                    {appUser?.name || appUser?.email || "Guest"}
+                    {user?.name || user?.email || "Guest"}
                 </Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex w-full px-5 py-3">
